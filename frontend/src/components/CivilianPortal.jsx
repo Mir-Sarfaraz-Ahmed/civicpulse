@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Camera, Image, MapPin, Search, PlusCircle, List, ArrowLeft, ArrowRight, Loader, Check, Trash2, HelpCircle, Eye, Shield, Truck, Wrench, CheckCircle, Clock, X, ZoomIn, Maximize2, ExternalLink, AlertCircle, FileText, User, Home, LogOut } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Camera, Image, PlusCircle, List, ArrowLeft, ArrowRight, Loader, Check, Trash2, HelpCircle, Eye, Shield, CheckCircle, Clock, X, ZoomIn, Maximize2, ExternalLink, User, Home, LogOut } from 'lucide-react';
 import MapComponent from './MapComponent';
 import { API_BASE, getImageUrl } from '../config';
 
@@ -40,14 +40,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [modalImage, selectedReportId]);
 
-  // Fetch civilian reports on load
-  useEffect(() => {
-    if (activeTab === 'list') {
-      fetchMyReports();
-    }
-  }, [activeTab]);
-
-  const fetchMyReports = async () => {
+  const fetchMyReports = useCallback(async () => {
     setLoadingList(true);
     setErrorMsg(null);
     try {
@@ -68,7 +61,14 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     } finally {
       setLoadingList(false);
     }
-  };
+  }, [token]);
+
+  // Fetch civilian reports on load
+  useEffect(() => {
+    if (activeTab === 'list') {
+      fetchMyReports();
+    }
+  }, [activeTab, fetchMyReports]);
 
   // Fetch complete timeline and authority actions for a single report
   const handleOpenTracking = async (reportId) => {
@@ -109,43 +109,6 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     }
   };
 
-  // Trigger server-side AI analysis
-  const handleRunAnalysis = async () => {
-    if (!selectedImage) {
-      setErrorMsg('Please select or capture an image first.');
-      return;
-    }
-    setAnalyzing(true);
-    setErrorMsg(null);
-
-    const formData = new FormData();
-    formData.append('image', selectedImage);
-    formData.append('description', description);
-    formData.append('latitude', location.lat);
-    formData.append('longitude', location.lng);
-
-    try {
-      const response = await fetch(`${API_BASE}/reports/analyze`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setAiAnalysis(data.analysis);
-        setReportStep(3); // move to review step
-      } else {
-        setErrorMsg(data.error || 'AI analysis failed.');
-      }
-    } catch (err) {
-      console.error(err);
-      setErrorMsg('Network error during AI analysis.');
-    } finally {
-      setAnalyzing(false);
-    }
-  };
 
   // Submit final report to database
   const handleSubmitReport = async () => {
@@ -284,12 +247,17 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Reported': return '#9ca3af';
+      case 'Reported':
+      case 'Under Review': return '#9ca3af';
       case 'AI Analysed': return '#9b51e0';
       case 'Verified': return '#4facfe';
-      case 'Assigned': return '#00f2fe';
+      case 'Assigned':
+      case 'Accepted': return '#00f2fe';
       case 'Dispatched': return '#ffcc00';
       case 'In Progress': return '#ff6b00';
+      case 'Resolution Submitted': return '#9b51e0';
+      case 'Resolution Rejected': return '#ff0055';
+      case 'Rejected': return '#ff0055';
       case 'Resolved': return '#00e676';
       case 'Closed': return '#059669';
       default: return '#fff';

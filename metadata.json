@@ -1,0 +1,10 @@
+{
+  "name": "CivicPulse AI",
+  "description": "AI-powered urban intelligence and civic response system for reporting and tracking civic infrastructure issues.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

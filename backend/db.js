@@ -33,13 +33,22 @@ function initDb() {
       category TEXT NOT NULL,
       severity TEXT NOT NULL,
       priority_score INTEGER NOT NULL,
-      status TEXT NOT NULL, -- 'Reported' | 'AI Analysed' | 'Verified' | 'Assigned' | 'Dispatched' | 'In Progress' | 'Resolved' | 'Closed'
+      status TEXT NOT NULL, -- 'Reported' | 'Under Review' | 'Verified' | 'Assigned' | 'Accepted' | 'In Progress' | 'Resolution Submitted' | 'Resolution Rejected' | 'Resolved' | 'Closed'
       latitude REAL NOT NULL,
       longitude REAL NOT NULL,
       address TEXT,
       assigned_worker TEXT,
+      assigned_crew_id TEXT,
+      assigned_at TIMESTAMP,
       dispatch_notes TEXT,
       resolution_evidence_url TEXT,
+      resolution_notes TEXT,
+      resolution_submitted_at TIMESTAMP,
+      rejection_reason TEXT,
+      rejected_at TIMESTAMP,
+      rejected_by TEXT,
+      approved_by TEXT,
+      approved_at TIMESTAMP,
       resolved_at TIMESTAMP,
       closed_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -80,11 +89,86 @@ function initDb() {
     );
   `);
 
+  // Ensure new columns exist for existing database files
+  const newCols = [
+    'assigned_crew_id TEXT',
+    'assigned_at TIMESTAMP',
+    'resolution_notes TEXT',
+    'resolution_submitted_at TIMESTAMP',
+    'rejection_reason TEXT',
+    'rejected_at TIMESTAMP',
+    'rejected_by TEXT',
+    'approved_by TEXT',
+    'approved_at TIMESTAMP'
+  ];
+  for (const colDef of newCols) {
+    try {
+      db.exec(`ALTER TABLE incidents ADD COLUMN ${colDef};`);
+    } catch (e) {
+      // Column already exists, ignore
+    }
+  }
+
   // Indexes for faster lookups
   db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);');
   db.exec('CREATE INDEX IF NOT EXISTS idx_incidents_coords ON incidents(latitude, longitude);');
   db.exec('CREATE INDEX IF NOT EXISTS idx_reports_incident ON reports(incident_id);');
   db.exec('CREATE INDEX IF NOT EXISTS idx_status_history_incident ON incident_status_history(incident_id);');
+
+  // Ensure ONLY the 3 requested default demo users exist in the database
+  try {
+    const bcrypt = require('bcryptjs');
+    const { v4: uuidv4 } = require('uuid');
+
+    const defaultUsers = [
+      {
+        email: 'admin@gmail.com',
+        password: '31102006',
+        role: 'admin',
+        name: 'City Municipal Admin'
+      },
+      {
+        email: 'crew@gmail.com',
+        password: '311102006',
+        role: 'crew',
+        name: 'Rapid Response Dispatch Crew'
+      },
+      {
+        email: 'citizen@gmail.com',
+        password: '31102006',
+        role: 'civilian',
+        name: 'Citizen Reporter'
+      }
+    ];
+
+    // Delete any old preset users
+    db.prepare(`
+      DELETE FROM users 
+      WHERE email IN (
+        'admin@directgmail.com', 'crew@directgmail.com', 'citizen@directgmail.com',
+        'admin@admindirectgmail.com', 'admin@admingmail.com', 'crew@crewgmail.com', 'citizen@citizengmail.com'
+      )
+    `).run();
+
+    for (const u of defaultUsers) {
+      const existing = db.prepare('SELECT id, password_hash, role FROM users WHERE email = ?').get(u.email);
+      const hash = bcrypt.hashSync(u.password, 10);
+      if (!existing) {
+        const id = uuidv4();
+        db.prepare('INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)').run(
+          id, u.email, hash, u.role, u.name
+        );
+        console.log(`[Database Init] Created preset account: ${u.email} (${u.role})`);
+      } else {
+        db.prepare('UPDATE users SET password_hash = ?, role = ?, name = ? WHERE email = ?').run(
+          hash, u.role, u.name, u.email
+        );
+        console.log(`[Database Init] Synchronized preset account: ${u.email}`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Database Init] Warning ensuring default users:', err.message);
+  }
 
   console.log('[Database] Migrations completed successfully.');
 }

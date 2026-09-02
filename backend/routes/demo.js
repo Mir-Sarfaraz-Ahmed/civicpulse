@@ -52,25 +52,26 @@ router.post('/seed', (req, res) => {
     const imgWire = writeDemoImage('demo_wire', 'wire');
     const imgResolved = writeDemoImage('demo_resolved', 'resolved');
 
-    // 3. Create Seed Users
+    // 3. Create Seed Users (Only the 3 requested accounts)
     const citizenId = uuidv4();
-    const secondCitizenId = uuidv4();
     const adminId = uuidv4();
+    const crewId = uuidv4();
 
-    const hashCivilian = bcrypt.hashSync('Password123', 10);
-    const hashAdmin = bcrypt.hashSync('AdminSecurePassword123', 10);
+    const hashCivilian = bcrypt.hashSync('31102006', 10);
+    const hashAdmin = bcrypt.hashSync('31102006', 10);
+    const hashCrew = bcrypt.hashSync('311102006', 10);
 
     query.run(
       'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
-      [citizenId, 'civilian@civilpulse.gov.in', hashCivilian, 'civilian', 'Rajesh Kumar']
+      [citizenId, 'citizen@gmail.com', hashCivilian, 'civilian', 'Citizen Reporter']
     );
     query.run(
       'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
-      [secondCitizenId, 'amit.verma@example.com', hashCivilian, 'civilian', 'Amit Verma']
+      [adminId, 'admin@gmail.com', hashAdmin, 'admin', 'City Municipal Admin']
     );
     query.run(
       'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
-      [adminId, 'admin@civilpulse.gov.in', hashAdmin, 'admin', 'Civic Admin']
+      [crewId, 'crew@gmail.com', hashCrew, 'crew', 'Rapid Response Dispatch Crew']
     );
 
     // Helper to insert incident, report, and initial status history
@@ -84,14 +85,30 @@ router.post('/seed', (req, res) => {
       lng,
       address,
       assignedWorker = null,
+      assignedCrewId = null,
       dispatchNotes = null,
       resolvedEvidence = null,
+      resolutionNotes = null,
+      rejectionReason = null,
+      approvedBy = null,
       reports = []
     }) {
+      const now = new Date();
+      const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 3600 * 1000).toISOString();
+      const oneDayAgo = new Date(now.getTime() - 1 * 24 * 3600 * 1000).toISOString();
+      const threeHoursAgo = new Date(now.getTime() - 3 * 3600 * 1000).toISOString();
+      const oneHourAgo = new Date(now.getTime() - 1 * 3600 * 1000).toISOString();
+
       // Create Incident
       query.run(
-        `INSERT INTO incidents (id, category, severity, priority_score, status, latitude, longitude, address, assigned_worker, dispatch_notes, resolution_evidence_url, resolved_at, closed_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO incidents (
+          id, category, severity, priority_score, status, latitude, longitude, address,
+          assigned_worker, assigned_crew_id, assigned_at, dispatch_notes,
+          resolution_evidence_url, resolution_notes, resolution_submitted_at,
+          rejection_reason, rejected_at, rejected_by,
+          approved_by, approved_at, resolved_at, closed_at,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           incidentId,
           category,
@@ -102,34 +119,50 @@ router.post('/seed', (req, res) => {
           lng,
           address,
           assignedWorker,
+          assignedCrewId,
+          assignedWorker ? oneDayAgo : null,
           dispatchNotes,
           resolvedEvidence,
-          status === 'Resolved' || status === 'Closed' ? new Date(Date.now() - 2 * 3600 * 1000).toISOString() : null,
-          status === 'Closed' ? new Date(Date.now() - 1 * 3600 * 1000).toISOString() : null,
-          new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
+          resolutionNotes,
+          status === 'Resolution Submitted' || status === 'Resolution Rejected' || status === 'Closed' || status === 'Resolved' ? threeHoursAgo : null,
+          rejectionReason,
+          rejectionReason ? oneHourAgo : null,
+          rejectionReason ? adminId : null,
+          approvedBy,
+          status === 'Closed' ? oneHourAgo : null,
+          status === 'Resolved' || status === 'Closed' ? threeHoursAgo : null,
+          status === 'Closed' ? oneHourAgo : null,
+          twoDaysAgo,
           new Date().toISOString()
         ]
       );
 
-      // Create status history logs
+      // Create initial status history log
       const hist1 = uuidv4();
       query.run(
         `INSERT INTO incident_status_history (id, incident_id, status, changed_by, notes, created_at)
-         VALUES (?, ?, 'Reported', ?, 'System generated seed report.', ?)`,
-        [hist1, incidentId, citizenId, new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()]
+         VALUES (?, ?, 'Reported', ?, 'Citizen submitted report. AI vision categorized incident.', ?)`,
+        [hist1, incidentId, citizenId, twoDaysAgo]
       );
 
       if (status !== 'Reported') {
         const hist2 = uuidv4();
         query.run(
           `INSERT INTO incident_status_history (id, incident_id, status, changed_by, notes, created_at)
-           VALUES (?, ?, ?, ?, 'State transitioned in demo configuration.', ?)`,
-          [hist2, incidentId, status, adminId, new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString()]
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            hist2, 
+            incidentId, 
+            status, 
+            status === 'Closed' ? adminId : (assignedWorker ? crewId : adminId),
+            rejectionReason ? `Admin Feedback: ${rejectionReason}` : `Workflow progressed to ${status}.`, 
+            oneDayAgo
+          ]
         );
       }
 
       // Create reports
-      reports.forEach((rep, idx) => {
+      reports.forEach((rep) => {
         const reportId = uuidv4();
         query.run(
           `INSERT INTO reports (id, citizen_id, incident_id, image_url, description, latitude, longitude, address, ai_problem, ai_category, ai_severity, ai_summary, created_at)
@@ -147,24 +180,28 @@ router.post('/seed', (req, res) => {
             category,
             rep.severity,
             rep.summary,
-            new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
+            twoDaysAgo
           ]
         );
       });
     }
 
-    // --- SEED INCIDENTS ---
+    // --- SEED INCIDENTS COVERING ALL LIFECYCLE STAGES ---
 
-    // 1. Pothole near India Gate (Grouped duplicates, Status: Assigned)
+    // 1. Pothole near India Gate (Status: Resolution Submitted — Awaiting Admin Approval!)
     seedIncidentAndReports({
       category: 'Road Infrastructure',
       severity: 'High',
       priorityScore: 85,
-      status: 'Assigned',
+      status: 'Resolution Submitted',
       lat: 28.6129,
       lng: 77.2295,
       address: 'India Gate Circular Road, Delhi',
-      assignedWorker: 'Amit Sharma',
+      assignedWorker: 'Rapid Response Dispatch Crew',
+      assignedCrewId: crewId,
+      dispatchNotes: 'Deploy cold-mix asphalt patching and level surface.',
+      resolvedEvidence: imgResolved,
+      resolutionNotes: 'Pothole excavated, filled with bitumen cold-mix, compacted and spray-sealed.',
       reports: [
         {
           imageUrl: imgPothole,
@@ -174,98 +211,11 @@ router.post('/seed', (req, res) => {
           problem: 'Deep Pothole',
           severity: 'High',
           summary: 'Large deep pothole on the public roadway near a heavy traffic roundabout.'
-        },
-        {
-          imageUrl: imgPothole,
-          desc: 'Second lane has a massive road crack and pothole, India Gate area.',
-          lat: 28.6128,
-          lng: 77.2296,
-          problem: 'Pothole',
-          severity: 'Medium',
-          summary: 'Road surface disintegration and cracking observed.'
         }
       ]
     });
 
-    // 2. Garbage dump near Connaught Place (Single Report, Status: Reported)
-    seedIncidentAndReports({
-      category: 'Garbage / Dumping',
-      severity: 'Medium',
-      priorityScore: 35,
-      status: 'Reported',
-      lat: 28.6304,
-      lng: 77.2177,
-      address: 'Outer Circle, Connaught Place, Delhi',
-      reports: [
-        {
-          imageUrl: imgGarbage,
-          desc: 'Huge garbage pile overflowing near the block E entrance. Rotten smell.',
-          lat: 28.6304,
-          lng: 77.2177,
-          problem: 'Garbage Dump',
-          severity: 'Medium',
-          summary: 'Overflowing commercial waste dump reported on the pedestrian footpath.'
-        }
-      ]
-    });
-
-    // 3. Broken Streetlight near Red Fort (Single Report, Status: In Progress)
-    seedIncidentAndReports({
-      category: 'Safety Hazards',
-      severity: 'Medium',
-      priorityScore: 50,
-      status: 'In Progress',
-      lat: 28.6562,
-      lng: 77.2410,
-      address: 'Netaji Subhash Marg near Red Fort, Delhi',
-      assignedWorker: 'Rahul Kumar',
-      reports: [
-        {
-          imageUrl: imgLight,
-          desc: 'Three streetlights are not working, the highway near Red Fort is completely dark.',
-          lat: 28.6562,
-          lng: 77.2410,
-          problem: 'Broken Streetlight',
-          severity: 'Medium',
-          summary: 'Multiple consecutive non-functional streetlights resulting in poor road visibility.'
-        }
-      ]
-    });
-
-    // 4. Major Water Leakage near AIIMS Hospital (Grouped duplicates, Status: Dispatched)
-    seedIncidentAndReports({
-      category: 'Water Leakage',
-      severity: 'High',
-      priorityScore: 90,
-      status: 'Dispatched',
-      lat: 28.5672,
-      lng: 77.2100,
-      address: 'Aurobindo Marg near AIIMS Metro gate, Delhi',
-      assignedWorker: 'Suresh Gupta',
-      dispatchNotes: 'Dispatched plumbing team with replacement pipe valves.',
-      reports: [
-        {
-          imageUrl: imgWater,
-          desc: 'Water pipe burst near AIIMS Hospital, clean water flooding the metro entry.',
-          lat: 28.5671,
-          lng: 77.2101,
-          problem: 'Water Pipe Burst',
-          severity: 'High',
-          summary: 'Active pipeline failure causing high water volume discharge and flooding.'
-        },
-        {
-          imageUrl: imgWater,
-          desc: 'Huge puddle of water on road next to AIIMS, water seems to be leaking from underground.',
-          lat: 28.5673,
-          lng: 77.2099,
-          problem: 'Underground Leak',
-          severity: 'Medium',
-          summary: 'Underground water line fracture causing street-level pooling.'
-        }
-      ]
-    });
-
-    // 5. Dangerous open electric wire near Lajpat Nagar Market (Grouped, Status: Verified)
+    // 2. Open High-Voltage Wire near Lajpat Nagar (Status: Verified — Awaiting Dispatch Assignment)
     seedIncidentAndReports({
       category: 'Safety Hazards',
       severity: 'Critical',
@@ -283,33 +233,105 @@ router.post('/seed', (req, res) => {
           problem: 'Exposed High-Voltage Wires',
           severity: 'Critical',
           summary: 'High risk hazard involving live overhead electricity cables sagging within pedestrian reach.'
-        },
-        {
-          imageUrl: imgWire,
-          desc: 'Sparking wire hanging near shop entrance. Highly dangerous!',
-          lat: 28.5709,
-          lng: 77.2411,
-          problem: 'Sparking Electrical Cable',
-          severity: 'Critical',
-          summary: 'Active electrical discharge from damaged overhead utility line.'
         }
       ]
     });
 
-    // 6. Traffic Blockage near Karol Bagh Metro (Single Report, Status: Resolved)
+    // 3. Water Pipe Burst near AIIMS Hospital (Status: Assigned — Awaiting Crew Acceptance)
+    seedIncidentAndReports({
+      category: 'Water Leakage',
+      severity: 'High',
+      priorityScore: 90,
+      status: 'Assigned',
+      lat: 28.5672,
+      lng: 77.2100,
+      address: 'Aurobindo Marg near AIIMS Metro gate, Delhi',
+      assignedWorker: 'Rapid Response Dispatch Crew',
+      assignedCrewId: crewId,
+      dispatchNotes: 'Sewer & Pipe Isolation Unit needed. Shut valve at node 4.',
+      reports: [
+        {
+          imageUrl: imgWater,
+          desc: 'Water pipe burst near AIIMS Hospital, clean water flooding the metro entry.',
+          lat: 28.5671,
+          lng: 77.2101,
+          problem: 'Water Pipe Burst',
+          severity: 'High',
+          summary: 'Active pipeline failure causing high water volume discharge and flooding.'
+        }
+      ]
+    });
+
+    // 4. Broken Streetlight near Red Fort (Status: In Progress — Crew On Site)
+    seedIncidentAndReports({
+      category: 'Safety Hazards',
+      severity: 'Medium',
+      priorityScore: 50,
+      status: 'In Progress',
+      lat: 28.6562,
+      lng: 77.2410,
+      address: 'Netaji Subhash Marg near Red Fort, Delhi',
+      assignedWorker: 'Rapid Response Dispatch Crew',
+      assignedCrewId: crewId,
+      dispatchNotes: 'Inspect junction box #12 and replace LED fixture.',
+      reports: [
+        {
+          imageUrl: imgLight,
+          desc: 'Three streetlights are not working, the highway near Red Fort is completely dark.',
+          lat: 28.6562,
+          lng: 77.2410,
+          problem: 'Broken Streetlight',
+          severity: 'Medium',
+          summary: 'Multiple consecutive non-functional streetlights resulting in poor road visibility.'
+        }
+      ]
+    });
+
+    // 5. Commercial Garbage Dump near Connaught Place (Status: Resolution Rejected — Rework in Progress)
+    seedIncidentAndReports({
+      category: 'Garbage / Dumping',
+      severity: 'Medium',
+      priorityScore: 40,
+      status: 'Resolution Rejected',
+      lat: 28.6304,
+      lng: 77.2177,
+      address: 'Outer Circle, Connaught Place, Delhi',
+      assignedWorker: 'Rapid Response Dispatch Crew',
+      assignedCrewId: crewId,
+      dispatchNotes: 'Sanitation loader truck required.',
+      resolvedEvidence: imgGarbage,
+      resolutionNotes: 'Trash bags lifted from sidewalk.',
+      rejectionReason: 'The secondary bin behind the kiosk is still overflowing and oil stains remain on the sidewalk. Please sanitize completely.',
+      reports: [
+        {
+          imageUrl: imgGarbage,
+          desc: 'Huge garbage pile overflowing near the block E entrance. Rotten smell.',
+          lat: 28.6304,
+          lng: 77.2177,
+          problem: 'Garbage Dump',
+          severity: 'Medium',
+          summary: 'Overflowing commercial waste dump reported on the pedestrian footpath.'
+        }
+      ]
+    });
+
+    // 6. Traffic Obstruction on Pusa Road (Status: Closed — Formally Approved by Admin)
     seedIncidentAndReports({
       category: 'Traffic',
       severity: 'High',
       priorityScore: 70,
-      status: 'Resolved',
+      status: 'Closed',
       lat: 28.6425,
       lng: 77.1885,
       address: 'Pusa Road, Karol Bagh, Delhi',
       assignedWorker: 'Traffic Police Unit 4',
+      assignedCrewId: crewId,
       resolvedEvidence: imgResolved,
+      resolutionNotes: 'Heavy cargo container towed away and lane opened for regular traffic.',
+      approvedBy: adminId,
       reports: [
         {
-          imageUrl: imgPothole, // reported incident image
+          imageUrl: imgPothole,
           desc: 'An abandoned container is blocking two main lanes on Pusa Road, causing heavy traffic jams.',
           lat: 28.6425,
           lng: 77.1885,
@@ -320,11 +342,11 @@ router.post('/seed', (req, res) => {
       ]
     });
 
-    // 7. Waterlogging near Saket Metro (Grouped, Status: Reported)
+    // 7. Waterlogging near Saket Metro (Status: Reported — Fresh Citizen Report)
     seedIncidentAndReports({
       category: 'Water Leakage',
       severity: 'High',
-      priorityScore: 80,
+      priorityScore: 75,
       status: 'Reported',
       lat: 28.5222,
       lng: 77.2066,
@@ -338,96 +360,18 @@ router.post('/seed', (req, res) => {
           problem: 'Waterlogging',
           severity: 'High',
           summary: 'Severe localized flooding disrupting public transit access.'
-        },
-        {
-          imageUrl: imgWater,
-          desc: 'Drain is clogged, water is standing 1 foot deep near Saket Metro.',
-          lat: 28.5221,
-          lng: 77.2065,
-          problem: 'Clogged Storm Drain',
-          severity: 'High',
-          summary: 'Inoperative drainage inlet resulting in surface accumulation.'
         }
       ]
     });
 
-    // 8. Damaged Footpath near Delhi University (Single, Status: Closed)
-    seedIncidentAndReports({
-      category: 'Road Infrastructure',
-      severity: 'Low',
-      priorityScore: 45,
-      status: 'Closed',
-      lat: 28.6890,
-      lng: 77.2103,
-      address: 'North Campus, Delhi University, Delhi',
-      assignedWorker: 'PWD Zone 1',
-      resolvedEvidence: imgResolved,
-      reports: [
-        {
-          imageUrl: imgPothole,
-          desc: 'Broken pavement tiles make walking difficult for students near DU gate.',
-          lat: 28.6890,
-          lng: 77.2103,
-          problem: 'Broken Footpath Tiles',
-          severity: 'Low',
-          summary: 'Minor pedestrian surface tiles damage near school/college zone.'
-        }
-      ]
-    });
-
-    // 9. Clogged sewage line near Noida Sector 15 (Single, Status: Resolved)
-    seedIncidentAndReports({
-      category: 'Water Leakage',
-      severity: 'High',
-      priorityScore: 75,
-      status: 'Resolved',
-      lat: 28.5830,
-      lng: 77.3110,
-      address: 'Sector 15 Main Road, Noida',
-      assignedWorker: 'Noida Sewer Dept',
-      resolvedEvidence: imgResolved,
-      reports: [
-        {
-          imageUrl: imgWater,
-          desc: 'Sewage water backing up and overflowing onto the main market entry road.',
-          lat: 28.5830,
-          lng: 77.3110,
-          problem: 'Sewer Line Overflow',
-          severity: 'High',
-          summary: 'Blackwater sewage backflow discharging onto public streets.'
-        }
-      ]
-    });
-
-    // 10. Large Garbage Pile near Dwarka Sector 10 (Single, Status: Reported)
-    seedIncidentAndReports({
-      category: 'Garbage / Dumping',
-      severity: 'Low',
-      priorityScore: 20,
-      status: 'Reported',
-      lat: 28.5812,
-      lng: 77.0590,
-      address: 'Dwarka Sector 10 Market, Delhi',
-      reports: [
-        {
-          imageUrl: imgGarbage,
-          desc: 'Plastic boxes and cardboard dumped behind the vegetable market stalls.',
-          lat: 28.5812,
-          lng: 77.0590,
-          problem: 'Commercial Dumping',
-          severity: 'Low',
-          summary: 'Littering of secondary packing material behind retail market.'
-        }
-      ]
-    });
-
-    console.log('[Demo Seed] Database seeded successfully with 10 incidents and users.');
+    console.log('[Demo Seed] Database seeded successfully with multi-role incidents.');
     res.json({
       success: true,
-      message: 'Demo database seeded successfully.',
+      message: 'Demo database seeded successfully with all lifecycle states.',
       credentials: {
-        civilian: { email: 'civilian@civilpulse.gov.in', password: 'Password123' },
-        admin: { email: 'admin@civilpulse.gov.in', password: 'AdminSecurePassword123' }
+        civilian: { email: 'citizen@gmail.com', password: '31102006' },
+        admin: { email: 'admin@gmail.com', password: '31102006' },
+        crew: { email: 'crew@gmail.com', password: '311102006' }
       }
     });
 
@@ -437,7 +381,7 @@ router.post('/seed', (req, res) => {
   }
 });
 
-// Clear Route (Public, to clean up/reset the database easily)
+// Clear Route (Public)
 // Endpoint: POST /api/demo/clear
 router.post('/clear', (req, res) => {
   try {

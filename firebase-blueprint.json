@@ -1,0 +1,261 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account information and assigned role",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique user ID / Firebase Auth UID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["civilian", "admin", "crew"],
+          "description": "User role"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": ["id", "email", "name", "role", "created_at"]
+    },
+    "Incident": {
+      "title": "Incident",
+      "description": "Aggregated civic incident grouping multiple citizen reports with full dispatch & resolution lifecycle",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique incident ID"
+        },
+        "category": {
+          "type": "string",
+          "description": "Incident category"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["Low", "Medium", "High", "Critical"],
+          "description": "Severity level"
+        },
+        "priority_score": {
+          "type": "number",
+          "description": "Calculated priority score (0-100)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Reported", "Under Review", "AI Analysed", "Verified", "Assigned", "Accepted", "In Progress", "Resolution Submitted", "Resolution Rejected", "Resolved", "Closed"],
+          "description": "Workflow status of incident"
+        },
+        "latitude": {
+          "type": "number",
+          "description": "Latitude coordinate"
+        },
+        "longitude": {
+          "type": "number",
+          "description": "Longitude coordinate"
+        },
+        "address": {
+          "type": "string",
+          "description": "Location address"
+        },
+        "assigned_worker": {
+          "type": "string",
+          "description": "Assigned field worker or crew name"
+        },
+        "assigned_crew_id": {
+          "type": "string",
+          "description": "Assigned crew user or team ID"
+        },
+        "assigned_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when crew was assigned"
+        },
+        "dispatch_notes": {
+          "type": "string",
+          "description": "Dispatch notes and instructions"
+        },
+        "resolution_evidence_url": {
+          "type": "string",
+          "description": "URL of resolution photo evidence"
+        },
+        "resolution_notes": {
+          "type": "string",
+          "description": "Crew resolution description"
+        },
+        "resolution_submitted_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when resolution was submitted"
+        },
+        "rejection_reason": {
+          "type": "string",
+          "description": "Admin reason when resolution is rejected"
+        },
+        "rejected_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when resolution was rejected"
+        },
+        "rejected_by": {
+          "type": "string",
+          "description": "Admin ID who rejected resolution"
+        },
+        "approved_by": {
+          "type": "string",
+          "description": "Admin ID who approved resolution"
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when resolution was approved"
+        },
+        "resolved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when incident was resolved"
+        },
+        "closed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when incident was closed"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last updated timestamp"
+        }
+      },
+      "required": ["id", "category", "severity", "priority_score", "status", "latitude", "longitude", "created_at", "updated_at"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Individual citizen report of a civic problem",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique report ID"
+        },
+        "citizen_id": {
+          "type": "string",
+          "description": "Author user ID / citizen UID"
+        },
+        "incident_id": {
+          "type": "string",
+          "description": "Linked aggregated incident ID"
+        },
+        "image_url": {
+          "type": "string",
+          "description": "Uploaded image URL"
+        },
+        "description": {
+          "type": "string",
+          "description": "Citizen problem description"
+        },
+        "latitude": {
+          "type": "number",
+          "description": "Latitude coordinate"
+        },
+        "longitude": {
+          "type": "number",
+          "description": "Longitude coordinate"
+        },
+        "address": {
+          "type": "string",
+          "description": "Location address"
+        },
+        "ai_problem": {
+          "type": "string",
+          "description": "AI-detected problem title"
+        },
+        "ai_category": {
+          "type": "string",
+          "description": "AI-detected category"
+        },
+        "ai_severity": {
+          "type": "string",
+          "description": "AI-detected severity"
+        },
+        "ai_summary": {
+          "type": "string",
+          "description": "AI-generated summary"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of report submission"
+        }
+      },
+      "required": ["id", "citizen_id", "image_url", "latitude", "longitude", "ai_problem", "ai_category", "ai_severity", "created_at"]
+    },
+    "IncidentStatusHistory": {
+      "title": "IncidentStatusHistory",
+      "description": "Audit history of status changes on an incident",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique history entry ID"
+        },
+        "incident_id": {
+          "type": "string",
+          "description": "Target incident ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "New status value"
+        },
+        "changed_by": {
+          "type": "string",
+          "description": "Actor user ID"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Audit log notes"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of status change"
+        }
+      },
+      "required": ["id", "incident_id", "status", "changed_by", "created_at"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "UserProfile",
+      "description": "Collection of all user profiles and roles"
+    },
+    "incidents": {
+      "schema": "Incident",
+      "description": "Collection of aggregated civic incidents"
+    },
+    "reports": {
+      "schema": "Report",
+      "description": "Collection of citizen submitted reports"
+    },
+    "incident_status_history": {
+      "schema": "IncidentStatusHistory",
+      "description": "Audit logs of incident lifecycle status changes"
+    }
+  }
+}

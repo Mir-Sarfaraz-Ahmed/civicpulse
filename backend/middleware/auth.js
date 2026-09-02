@@ -2,24 +2,33 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'civicpulse_hackathon_jwt_secret_2026_key';
 
-function decodeSupabaseToken(token) {
+function decodeFirebaseToken(token) {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-    // Supabase JWTs contain: sub (user id), email, role, user_metadata, etc.
-    if (payload.sub && payload.email) {
-      const isAdmin = 
-        payload.user_metadata?.role === 'admin' ||
-        payload.role === 'admin' ||
-        payload.email.toLowerCase().includes('admin') ||
-        payload.email.toLowerCase().endsWith('@civilpulse.gov.in');
+    // Firebase ID tokens contain: sub (user_id), email, name, firebase metadata
+    const userId = payload.user_id || payload.sub;
+    if (userId && payload.email) {
+      const normalizedEmail = payload.email.toLowerCase().trim();
+      
+      let dbRole = null;
+      let dbName = null;
+      try {
+        const existing = query.get('SELECT role, name FROM users WHERE email = ? OR id = ?', [normalizedEmail, userId]);
+        if (existing) {
+          dbRole = existing.role;
+          dbName = existing.name;
+        }
+      } catch (e) {}
+
+      const role = dbRole || payload.role || (payload.admin === true ? 'admin' : 'civilian');
 
       return {
-        id: payload.sub,
+        id: userId,
         email: payload.email,
-        role: isAdmin ? 'admin' : (payload.user_metadata?.role || 'civilian'),
-        name: payload.user_metadata?.name || payload.email,
+        role: role,
+        name: dbName || payload.name || payload.email.split('@')[0],
       };
     }
     return null;
@@ -55,7 +64,7 @@ function ensureUserInDb(user) {
   }
 }
 
-// Middleware to authenticate JWT (supports both local and Supabase tokens)
+// Middleware to authenticate JWT (supports both local and Firebase tokens)
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
@@ -73,11 +82,11 @@ function authenticateToken(req, res, next) {
       return next();
     }
 
-    // Try 2: Decode as Supabase JWT
-    const supabaseUser = decodeSupabaseToken(token);
-    if (supabaseUser) {
-      req.user = supabaseUser;
-      ensureUserInDb(supabaseUser);
+    // Try 2: Decode as Firebase JWT
+    const firebaseUser = decodeFirebaseToken(token);
+    if (firebaseUser) {
+      req.user = firebaseUser;
+      ensureUserInDb(firebaseUser);
       return next();
     }
 

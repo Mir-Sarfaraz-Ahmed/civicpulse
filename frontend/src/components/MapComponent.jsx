@@ -83,7 +83,6 @@ export default function MapComponent({
   // Handle value change for picker marker
   useEffect(() => {
     if (mode === 'pick' && mapInstanceRef.current && markerInstanceRef.current) {
-      const L = window.L;
       const currentPos = markerInstanceRef.current.getLatLng();
       if (currentPos.lat !== value.lat || currentPos.lng !== value.lng) {
         markerInstanceRef.current.setLatLng([value.lat, value.lng]);
