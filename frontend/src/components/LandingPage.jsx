@@ -1,10 +1,43 @@
 import React from 'react';
 import { Eye, Flame, ArrowRight, Zap, BarChart2 } from 'lucide-react';
+import { GlassFold } from './ui/glass-fold';
 
 export default function LandingPage({ onNavigate, user, onLogout }) {
   return (
-    <div className="landing-page" style={{ paddingBottom: '70px' }}>
+    <div className="landing-page" style={{ position: 'relative', minHeight: '100vh', paddingBottom: '70px', overflowX: 'hidden' }}>
       
+      {/* GlassFold Animated WebGL Background Layer */}
+      <div 
+        style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          zIndex: 0, 
+          pointerEvents: 'none',
+          overflow: 'hidden'
+        }}
+      >
+        <GlassFold
+          color1="#1e3cc8"
+          color2="#06081e"
+          color3="#96d7ff"
+          speed={0.4}
+          scale={1}
+          noise={0.12}
+        />
+        {/* Soft Vignette Overlay for Crisp Contrast */}
+        <div 
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 50% 30%, rgba(7, 9, 19, 0.45) 0%, rgba(7, 9, 19, 0.85) 100%)',
+            pointerEvents: 'none'
+          }}
+        />
+      </div>
+
+      {/* Foreground Content (100% Unchanged) */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+
       {/* 1. Navbar */}
       <header className="navbar">
         <div className="container flex-row-between" style={{ minHeight: '64px', flexWrap: 'wrap', gap: '12px' }}>
@@ -202,6 +235,8 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           </div>
         </div>
       </footer>
+
+      </div>
 
     </div>
   );
