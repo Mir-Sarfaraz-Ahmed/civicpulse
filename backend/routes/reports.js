@@ -9,25 +9,9 @@ const { processReportGrouping } = require('../utils/incidentEngine');
 
 const router = express.Router();
 
-// Configure storage and ensure folder exists (uses /tmp on Vercel)
-const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
-const uploadsDir = isVercel ? path.join('/tmp', 'uploads') : path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  }
-});
-
+// Configure in-memory upload storage (Zero local disk writes, direct to Supabase Storage)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -98,31 +82,32 @@ const { deleteReportFromSupabase, deleteIncidentFromSupabase } = require('../sup
 // 1. Upload & Analyze Image with AI (Protected)
 // Endpoint: POST /api/reports/analyze
 router.post('/analyze', requireAuth, upload.single('image'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'An image file is required to analyze.' });
+  if (!req.file && !req.body.imageUrl) {
+    return res.status(400).json({ error: 'An image file or image URL is required to analyze.' });
   }
 
   const { description, latitude, longitude } = req.body;
-  const imagePath = req.file.path;
-  let imageUrl = `/uploads/${req.file.filename}`;
+  const userId = req.user?.id || 'citizen';
+  let imageUrl = req.body.imageUrl || '';
 
-  // Upload to Supabase Storage
-  try {
-    const fileBuffer = fs.readFileSync(imagePath);
-    const storageUrl = await uploadToStorage(fileBuffer, req.file.originalname, req.file.mimetype, 'reports');
-    if (storageUrl) {
-      imageUrl = storageUrl;
-      console.log(`[Supabase Storage] Report image saved to bucket: ${imageUrl}`);
+  // Upload buffer directly to Supabase Storage in user's folder if not already uploaded
+  if (req.file && !imageUrl) {
+    try {
+      const storageUrl = await uploadToStorage(req.file.buffer, req.file.originalname, req.file.mimetype, 'reports', userId);
+      if (storageUrl) {
+        imageUrl = storageUrl;
+        console.log(`[Supabase Storage] Report image saved to user folder: ${imageUrl}`);
+      }
+    } catch (storageErr) {
+      console.warn('[Supabase Storage Warning] Upload error:', storageErr.message);
     }
-  } catch (storageErr) {
-    console.warn('[Supabase Storage Warning] Falling back to local image URL:', storageErr.message);
   }
 
   const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_BACKUP_KEY].filter(Boolean);
 
   if (apiKeys.length === 0) {
     console.warn('[AI Layer] No GEMINI_API_KEY defined. Using local heuristics engine.');
-    const analysis = runHeuristicFallback(description, req.file.originalname);
+    const analysis = runHeuristicFallback(description, req.file ? req.file.originalname : 'image.jpg');
     return res.json({
       imageUrl,
       analysis
@@ -130,8 +115,8 @@ router.post('/analyze', requireAuth, upload.single('image'), async (req, res) =>
   }
 
   try {
-    // Read the image file and convert to base64
-    const imageBase64 = fs.readFileSync(imagePath).toString('base64');
+    // Convert memory buffer to base64 for Gemini multimodal input
+    const imageBase64 = req.file ? req.file.buffer.toString('base64') : '';
     
     // Construct prompt
     const promptText = `

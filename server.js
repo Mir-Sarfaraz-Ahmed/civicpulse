@@ -18,11 +18,7 @@ try {
   process.exit(1);
 }
 
-// Ensure uploads folder exists in backend
-const uploadsDir = path.join(__dirname, 'backend', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Storage is fully cloud-hosted via Supabase Storage bucket ('civicpusleai')
 
 // Global Middlewares
 app.use(cors());

@@ -10,25 +10,9 @@ const { syncIncident, syncStatusHistory } = require('../supabaseSync');
 
 const router = express.Router();
 
-// Configure multer for resolution evidence upload (uses /tmp on Vercel)
-const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
-const uploadsDir = isVercel ? path.join('/tmp', 'uploads') : path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `resolved_${uuidv4()}${ext}`);
-  }
-});
-
+// Configure in-memory upload storage (Zero local disk writes, direct to Supabase Storage)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -519,17 +503,15 @@ router.patch('/:id/crew-submit-resolution', requireAuth, upload.single('evidence
   const { resolutionNotes, notes, evidenceUrl: providedUrl } = req.body;
 
   let finalEvidenceUrl = providedUrl;
-  if (req.file) {
-    finalEvidenceUrl = `/uploads/${req.file.filename}`;
+  if (req.file && !finalEvidenceUrl) {
     try {
-      const fileBuffer = fs.readFileSync(req.file.path);
-      const storageUrl = await uploadToStorage(fileBuffer, req.file.originalname, req.file.mimetype, 'resolutions');
+      const storageUrl = await uploadToStorage(req.file.buffer, req.file.originalname, req.file.mimetype, 'resolutions', req.user?.id || 'crew');
       if (storageUrl) {
         finalEvidenceUrl = storageUrl;
-        console.log(`[Supabase Storage] Resolution evidence uploaded: ${finalEvidenceUrl}`);
+        console.log(`[Supabase Storage] Resolution evidence uploaded to user folder: ${finalEvidenceUrl}`);
       }
     } catch (storageErr) {
-      console.warn('[Supabase Storage Warning] Resolution evidence local fallback:', storageErr.message);
+      console.warn('[Supabase Storage Warning] Resolution evidence upload error:', storageErr.message);
     }
   }
 
@@ -613,13 +595,16 @@ router.patch('/:id/dispatch', requireRole('admin'), (req, res) => {
 });
 
 // PATCH /api/incidents/:id/resolve (Legacy / Admin Direct Resolve)
-router.patch('/:id/resolve', requireAuth, upload.single('evidence'), (req, res) => {
+router.patch('/:id/resolve', requireAuth, upload.single('evidence'), async (req, res) => {
   const incidentId = req.params.id;
   const { notes, resolutionNotes, evidenceUrl: providedUrl } = req.body;
 
   let evidenceUrl = providedUrl;
-  if (req.file) {
-    evidenceUrl = `/uploads/${req.file.filename}`;
+  if (req.file && !evidenceUrl) {
+    try {
+      const storageUrl = await uploadToStorage(req.file.buffer, req.file.originalname, req.file.mimetype, 'resolutions', req.user?.id || 'admin');
+      if (storageUrl) evidenceUrl = storageUrl;
+    } catch (e) {}
   }
 
   if (!evidenceUrl) {

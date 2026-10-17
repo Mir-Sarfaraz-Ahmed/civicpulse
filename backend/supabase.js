@@ -100,16 +100,18 @@ async function getUserFromToken(token) {
 }
 
 /**
- * Uploads a file buffer to Supabase Storage ('civicpulse-uploads' bucket)
+ * Uploads a file buffer to Supabase Storage bucket ('civicpusleai')
  * @param {Buffer} buffer 
  * @param {string} originalName 
  * @param {string} mimeType 
  * @param {string} folderPrefix 
+ * @param {string} userId
  * @returns {Promise<string>} Public URL of uploaded asset
  */
-async function uploadToStorage(buffer, originalName, mimeType = 'image/jpeg', folderPrefix = 'reports') {
+async function uploadToStorage(buffer, originalName, mimeType = 'image/jpeg', folderPrefix = 'reports', userId = 'general') {
   const ext = originalName ? originalName.split('.').pop() : 'jpg';
-  const filePath = `${folderPrefix}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+  const safeUserId = (userId || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filePath = `${folderPrefix}/${safeUserId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
   // Ensure bucket exists
   try {

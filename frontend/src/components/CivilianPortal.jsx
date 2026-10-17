@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Camera, Image, PlusCircle, List, ArrowLeft, ArrowRight, Loader, Check, Trash2, HelpCircle, Eye, Shield, CheckCircle, Clock, X, ZoomIn, Maximize2, ExternalLink, User, Home, LogOut } from 'lucide-react';
 import MapComponent from './MapComponent';
 import { API_BASE, getImageUrl } from '../config';
+import { uploadToSupabaseStorage } from '../supabaseClient';
 
 export default function CivilianPortal({ token, user, onLogout, onBackToHome }) {
   const [activeTab, setActiveTab] = useState('list'); // 'list' or 'report'
@@ -167,7 +168,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     }
   };
 
-  // Modify handleRunAnalysis to store the uploaded image URL returned from Express
+  // Upload directly to Supabase Storage in user's folder and analyze with AI
   const handleRunAnalysisAndUpload = async () => {
     if (!selectedImage) {
       setErrorMsg('Please select or capture an image first.');
@@ -176,8 +177,19 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     setAnalyzing(true);
     setErrorMsg(null);
 
+    let supabaseImageUrl = null;
+    try {
+      supabaseImageUrl = await uploadToSupabaseStorage(selectedImage, 'reports', user?.id || 'citizen');
+      window.lastUploadedUrl = supabaseImageUrl;
+    } catch (uploadErr) {
+      console.warn('[Direct Supabase Storage Note]:', uploadErr.message);
+    }
+
     const formData = new FormData();
     formData.append('image', selectedImage);
+    if (supabaseImageUrl) {
+      formData.append('imageUrl', supabaseImageUrl);
+    }
     formData.append('description', description);
     formData.append('latitude', location.lat);
     formData.append('longitude', location.lng);
@@ -192,8 +204,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
       });
       const data = await response.json();
       if (response.ok) {
-        // Save the image URL in a global or state variable so we can use it in final submission
-        window.lastUploadedUrl = data.imageUrl;
+        window.lastUploadedUrl = data.imageUrl || supabaseImageUrl;
         setAiAnalysis(data.analysis);
         setReportStep(3); // Move to review step
       } else {

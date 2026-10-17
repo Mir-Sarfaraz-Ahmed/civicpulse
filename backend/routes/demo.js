@@ -19,16 +19,8 @@ const base64Images = {
 };
 
 function writeDemoImage(name, colorKey) {
-  const uploadsDir = path.join(__dirname, '..', 'uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  const filePath = path.join(uploadsDir, `${name}.png`);
-  if (!fs.existsSync(filePath)) {
-    const data = base64Images[colorKey] || base64Images.pothole;
-    fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
-  }
-  return `/uploads/${name}.png`;
+  const data = base64Images[colorKey] || base64Images.pothole;
+  return `data:image/png;base64,${data}`;
 }
 
 // Seed Route (Public, to initialize hackathon review easily)

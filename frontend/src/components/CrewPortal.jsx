@@ -24,7 +24,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { API_BASE, getImageUrl } from '../config';
-import { supabase } from '../supabaseClient';
+import { supabase, uploadToSupabaseStorage } from '../supabaseClient';
 
 export default function CrewPortal({ token, user, onLogout, onBackToHome }) {
   const [tasks, setTasks] = useState([]);
@@ -189,8 +189,18 @@ export default function CrewPortal({ token, user, onLogout, onBackToHome }) {
     setActionError(null);
     setActionSuccess(null);
 
+    let supabaseEvidenceUrl = null;
+    try {
+      supabaseEvidenceUrl = await uploadToSupabaseStorage(evidenceFile, 'resolutions', user?.id || 'crew');
+    } catch (uploadErr) {
+      console.warn('[Direct Crew Supabase Upload Note]:', uploadErr.message);
+    }
+
     const formData = new FormData();
     formData.append('evidence', evidenceFile);
+    if (supabaseEvidenceUrl) {
+      formData.append('evidenceUrl', supabaseEvidenceUrl);
+    }
     formData.append('resolutionNotes', resolutionNotes || 'Repairs completed according to standard municipal guidelines.');
 
     try {

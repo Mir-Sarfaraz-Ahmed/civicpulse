@@ -17,11 +17,7 @@ try {
   process.exit(1);
 }
 
-// Ensure uploads folder exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Storage is fully cloud-hosted via Supabase Storage bucket ('civicpusleai')
 
 // Global Middlewares
 app.use(cors()); // Allow cross-origin requests from React dev client

@@ -21,11 +21,12 @@ export const BUCKET_NAME = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'civi
  * @param {string} folderPrefix 
  * @returns {Promise<string>} Public URL of the uploaded image
  */
-export async function uploadToSupabaseStorage(file, folderPrefix = 'reports') {
+export async function uploadToSupabaseStorage(file, folderPrefix = 'reports', userId = 'general') {
   if (!file) throw new Error('No file provided for upload.');
 
   const ext = file.name ? file.name.split('.').pop() : 'jpg';
-  const fileName = `${folderPrefix}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+  const safeUserId = (userId || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `${folderPrefix}/${safeUserId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
   const { data, error } = await supabase.storage
     .from(BUCKET_NAME)
