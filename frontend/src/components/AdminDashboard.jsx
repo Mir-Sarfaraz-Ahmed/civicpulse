@@ -415,7 +415,7 @@ export default function AdminDashboard({ token, user, onLogout, onBackToHome }) 
             
             {/* User Profile Badge */}
             <div 
-              title={`${user?.name || 'City Municipal Admin'} (${user?.email || 'admin@gmail.com'})`}
+              title={user?.name || 'City Municipal Admin'}
               style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -465,7 +465,7 @@ export default function AdminDashboard({ token, user, onLogout, onBackToHome }) 
                     ADMIN
                   </span>
                 </div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user?.email || 'admin@gmail.com'}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Verified Municipal Authority</span>
               </div>
             </div>
 

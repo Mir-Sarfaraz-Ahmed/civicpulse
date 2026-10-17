@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Camera, Image, PlusCircle, List, ArrowLeft, ArrowRight, Loader, Check, Trash2, HelpCircle, Eye, Shield, CheckCircle, Clock, X, ZoomIn, Maximize2, ExternalLink, User, Home, LogOut } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Camera, Image, PlusCircle, List, ArrowLeft, ArrowRight, Loader, Check, Trash2, HelpCircle, Eye, Shield, CheckCircle, Clock, X, ZoomIn, Maximize2, ExternalLink, User, Home, LogOut, Mic, MicOff, FileText } from 'lucide-react';
 import MapComponent from './MapComponent';
 import { API_BASE, getImageUrl } from '../config';
 import { uploadToSupabaseStorage } from '../supabaseClient';
@@ -22,6 +22,10 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
   const [submitting, setSubmitting] = useState(false);
   const [trackingId, setTrackingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Voice Input (Web Speech API) States
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
 
   // Tracking & Authority Action Details Modal State
   const [selectedReportId, setSelectedReportId] = useState(null);
@@ -202,23 +206,27 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
 
   // Upload directly to Supabase Storage in user's folder and analyze with AI
   const handleRunAnalysisAndUpload = async () => {
-    if (!selectedImage) {
-      setErrorMsg('Please select or capture an image first.');
+    if (!selectedImage && !description.trim()) {
+      setErrorMsg('Please upload a photo or write / dictate an issue description first.');
       return;
     }
     setAnalyzing(true);
     setErrorMsg(null);
 
     let supabaseImageUrl = null;
-    try {
-      supabaseImageUrl = await uploadToSupabaseStorage(selectedImage, 'reports', user?.id || 'citizen');
-      window.lastUploadedUrl = supabaseImageUrl;
-    } catch (uploadErr) {
-      console.warn('[Direct Supabase Storage Note]:', uploadErr.message);
+    if (selectedImage) {
+      try {
+        supabaseImageUrl = await uploadToSupabaseStorage(selectedImage, 'reports', user?.id || 'citizen');
+        window.lastUploadedUrl = supabaseImageUrl;
+      } catch (uploadErr) {
+        console.warn('[Direct Supabase Storage Note]:', uploadErr.message);
+      }
     }
 
     const formData = new FormData();
-    formData.append('image', selectedImage);
+    if (selectedImage) {
+      formData.append('image', selectedImage);
+    }
     if (supabaseImageUrl) {
       formData.append('imageUrl', supabaseImageUrl);
     }
@@ -236,7 +244,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
       });
       const data = await response.json();
       if (response.ok) {
-        window.lastUploadedUrl = data.imageUrl || supabaseImageUrl;
+        window.lastUploadedUrl = data.imageUrl || supabaseImageUrl || '';
         setAiAnalysis(data.analysis);
         setReportStep(3); // Move to review step
       } else {
@@ -275,8 +283,96 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     }
   };
 
+  // Voice Dictation handler using Web Speech API
+  const toggleVoiceRecording = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome, Edge, or enter text manually.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setErrorMsg(null);
+      };
+
+      recognition.onresult = (event) => {
+        let finalSpeech = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalSpeech += event.results[i][0].transcript + ' ';
+          }
+        }
+        if (finalSpeech.trim()) {
+          setDescription(prev => {
+            const cleanSpeech = finalSpeech.trim();
+            return prev ? `${prev.trim()} ${cleanSpeech}` : cleanSpeech;
+          });
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('[Web Speech Error]', event.error);
+        if (event.error === 'not-allowed') {
+          setErrorMsg('Microphone permission was denied. Please allow microphone access in your browser.');
+        } else if (event.error !== 'no-speech') {
+          setErrorMsg(`Voice input: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('[Web Speech Init Error]', err);
+      setIsListening(false);
+      setErrorMsg('Could not initialize voice dictation.');
+    }
+  };
+
+  // Clean up recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+    };
+  }, []);
+
+  // Advance from Step 1 to Step 2
+  const handleProceedToLocation = () => {
+    if (!selectedImage && !description.trim()) {
+      setErrorMsg('Please upload an evidence photo or enter / dictate an issue description to proceed.');
+      return;
+    }
+    setErrorMsg(null);
+    setReportStep(2);
+  };
+
   // Clean form and restart
-  const resetForm = () => {
+  const resetForm = (targetTab = 'report') => {
+    if (isListening && recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) {}
+      setIsListening(false);
+    }
     setSelectedImage(null);
     setImagePreview(null);
     setDescription('');
@@ -285,7 +381,9 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     setTrackingId(null);
     setReportStep(1);
     setErrorMsg(null);
-    setActiveTab('list');
+    if (targetTab) {
+      setActiveTab(targetTab);
+    }
   };
 
   const getStatusColor = (status) => {
@@ -355,12 +453,12 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                   color: '#000',
                   fontSize: '0.85rem'
                 }}>
-                  {user.name ? user.name[0].toUpperCase() : (user.email ? user.email[0].toUpperCase() : 'C')}
+                  {user.name ? user.name[0].toUpperCase() : 'C'}
                 </div>
               )}
               <div>
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {user.name || user.email}
+                  {user.name || 'Citizen Reporter'}
                   <span style={{
                     fontSize: '0.68rem',
                     fontWeight: 700,
@@ -372,9 +470,6 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                   }}>
                     {user.role || 'Citizen'}
                   </span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  {user.email}
                 </div>
               </div>
             </div>
@@ -411,7 +506,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
             <List size={16} /> My Submissions
           </button>
           <button 
-            onClick={() => { setActiveTab('report'); resetForm(); }} 
+            onClick={() => resetForm('report')} 
             className={`btn ${activeTab === 'report' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ padding: '8px 16px', fontSize: '0.85rem', border: 'none', boxShadow: activeTab === 'report' ? 'var(--shadow-neon)' : 'none' }}
           >
@@ -637,26 +732,81 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                   </div>
                 )}
 
-                {/* Description Input */}
+                {/* Description Input & Voice Input */}
                 <div style={{ width: '100%', marginTop: '20px' }}>
-                  <label className="form-label">Optional Description / Details</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                    <label className="form-label" style={{ marginBottom: 0 }}>Incident Description / Details</label>
+                    <button
+                      type="button"
+                      onClick={toggleVoiceRecording}
+                      className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'}`}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '0.8rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '20px',
+                        border: isListening ? '1px solid #ef4444' : '1px solid var(--border-light)',
+                        boxShadow: isListening ? '0 0 12px rgba(239, 68, 68, 0.5)' : 'none',
+                        cursor: 'pointer'
+                      }}
+                      title={isListening ? 'Stop voice recording' : 'Dictate description using microphone'}
+                    >
+                      {isListening ? (
+                        <>
+                          <MicOff size={14} style={{ color: '#fff' }} />
+                          <span style={{ color: '#fff', fontWeight: 600 }}>Stop Listening</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic size={14} style={{ color: 'var(--primary-neon)' }} />
+                          <span>Voice Input (Dictate)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {isListening && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#ff6b6b',
+                      fontSize: '0.82rem',
+                      marginBottom: '10px'
+                    }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                      <span><strong>Listening...</strong> Speak clearly to dictate details for the incident report.</span>
+                    </div>
+                  )}
+
                   <textarea 
-                    placeholder="Enter details like landmarks, description of damage, or specific safety concerns (e.g. near school gate)..."
+                    placeholder="Enter details like landmarks, description of damage, or specific safety concerns (e.g. near school gate) — or use Voice Input..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="form-input"
                     rows="3"
                     style={{ resize: 'none' }}
                   />
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    💡 You can submit with an evidence photo, voice dictation, or written description.
+                  </div>
                 </div>
               </div>
 
               <div className="flex-row-between" style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: '30px' }}>
                 <span />
                 <button 
-                  onClick={() => setReportStep(2)} 
-                  disabled={!selectedImage}
+                  onClick={handleProceedToLocation} 
                   className="btn btn-primary"
+                  style={{
+                    opacity: (!selectedImage && !description.trim()) ? 0.75 : 1
+                  }}
                 >
                   Next: Add Location <ArrowRight size={16} />
                 </button>
@@ -719,7 +869,14 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                 {/* Image & Description Block */}
                 <div>
                   <div style={{ width: '100%', height: '180px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-light)', marginBottom: '12px' }}>
-                    <img src={imagePreview} alt="Incident" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="Incident" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', background: 'rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-muted)' }}>
+                        <Mic size={32} style={{ color: 'var(--primary-neon)' }} />
+                        <span style={{ fontSize: '0.85rem' }}>Voice / Text Incident (No photo attached)</span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                     <strong>User Notes: </strong>{description || 'No notes provided.'}
@@ -810,20 +967,11 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
               </div>
 
               <div className="flex-row-center" style={{ gap: '12px' }}>
-                <button onClick={resetForm} className="btn btn-primary">
+                <button onClick={() => resetForm('list')} className="btn btn-primary">
                   View My Submissions
                 </button>
                 <button 
-                  onClick={() => {
-                    setSelectedImage(null);
-                    setImagePreview(null);
-                    setDescription('');
-                    setLocation({ lat: 28.6139, lng: 77.2295, address: 'Delhi, India' });
-                    setAiAnalysis(null);
-                    setTrackingId(null);
-                    setReportStep(1);
-                    setErrorMsg(null);
-                  }} 
+                  onClick={() => resetForm('report')} 
                   className="btn btn-secondary"
                 >
                   File Another Report
@@ -1043,7 +1191,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                     </div>
 
                     <div 
-                      onClick={() => setModalImage({
+                      onClick={() => trackingDetails.report.image_url && setModalImage({
                         url: getImageUrl(trackingDetails.report.image_url),
                         title: 'Your Evidence Photo',
                         subtitle: `Reported on ${new Date(trackingDetails.report.created_at).toLocaleString()}`,
@@ -1051,16 +1199,25 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                         summary: trackingDetails.report.ai_summary,
                         badge: 'Citizen Evidence'
                       })}
-                      style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)', cursor: 'pointer', position: 'relative' }}
+                      style={{ height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)', cursor: trackingDetails.report.image_url ? 'pointer' : 'default', position: 'relative' }}
                     >
-                      <img 
-                        src={getImageUrl(trackingDetails.report.image_url)} 
-                        alt="Citizen evidence" 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      />
-                      <div style={{ position: 'absolute', bottom: 0, insetInline: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', padding: '4px 8px', fontSize: '0.72rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Maximize2 size={12} style={{ color: 'var(--primary-neon)' }} /> View Full Photo
-                      </div>
+                      {trackingDetails.report.image_url ? (
+                        <img 
+                          src={getImageUrl(trackingDetails.report.image_url)} 
+                          alt="Citizen evidence" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                      ) : (
+                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(255,255,255,0.02)' }}>
+                          <FileText size={24} style={{ color: 'var(--primary-neon)' }} />
+                          <span>Voice / Text Report (No Photo)</span>
+                        </div>
+                      )}
+                      {trackingDetails.report.image_url && (
+                        <div style={{ position: 'absolute', bottom: 0, insetInline: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', padding: '4px 8px', fontSize: '0.72rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Maximize2 size={12} style={{ color: 'var(--primary-neon)' }} /> View Full Photo
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ marginTop: '8px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>

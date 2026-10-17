@@ -82,8 +82,8 @@ const { deleteReportFromSupabase, deleteIncidentFromSupabase } = require('../sup
 // 1. Upload & Analyze Image with AI (Protected)
 // Endpoint: POST /api/reports/analyze
 router.post('/analyze', requireAuth, upload.single('image'), async (req, res) => {
-  if (!req.file && !req.body.imageUrl) {
-    return res.status(400).json({ error: 'An image file or image URL is required to analyze.' });
+  if (!req.file && !req.body.imageUrl && (!req.body.description || !req.body.description.trim())) {
+    return res.status(400).json({ error: 'An image or issue description is required to analyze.' });
   }
 
   const { description, latitude, longitude } = req.body;
@@ -107,7 +107,7 @@ router.post('/analyze', requireAuth, upload.single('image'), async (req, res) =>
 
   if (apiKeys.length === 0) {
     console.warn('[AI Layer] No GEMINI_API_KEY defined. Using local heuristics engine.');
-    const analysis = runHeuristicFallback(description, req.file ? req.file.originalname : 'image.jpg');
+    const analysis = runHeuristicFallback(description, req.file ? req.file.originalname : 'issue.txt');
     return res.json({
       imageUrl,
       analysis
@@ -120,17 +120,17 @@ router.post('/analyze', requireAuth, upload.single('image'), async (req, res) =>
     
     // Construct prompt
     const promptText = `
-You are the CivicPulse AI analysis engine. Analyze this image of a civic issue, along with the optional user description and location.
+You are the CivicPulse AI analysis engine. Analyze this civic incident report based on the provided details${req.file ? ' and uploaded photo' : ''}.
+Incident description / voice note: "${description || 'None'}"
+Location coordinates: "${latitude || 'unknown'}, ${longitude || 'unknown'}"
+
 You MUST respond with a valid JSON object matching the following structure:
 {
-  "problem": "Name of the problem, e.g. Pothole, Broken Streetlight, Trash Pile",
+  "problem": "Name of the problem, e.g. Pothole, Broken Streetlight, Trash Pile, Water Leakage",
   "category": "One of: Road Infrastructure, Damaged Infrastructure, Safety Hazards, Traffic, Water Leakage, Garbage / Dumping, Other",
   "severity": "One of: Low, Medium, High, Critical",
   "summary": "A concise, single-sentence summary of the detected problem and its surroundings."
 }
-
-Optional user description: "${description || 'None'}"
-Optional location coordinates: "${latitude || 'unknown'}, ${longitude || 'unknown'}"
 
 Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
 `;
@@ -151,25 +151,23 @@ Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
       for (const model of candidateModels) {
         try {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+          const parts = [{ text: promptText }];
+          if (imageBase64) {
+            parts.push({
+              inlineData: {
+                mimeType: req.file.mimetype || 'image/jpeg',
+                data: imageBase64
+              }
+            });
+          }
+
           const response = await fetch(geminiUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: promptText },
-                    {
-                      inlineData: {
-                        mimeType: req.file.mimetype || 'image/jpeg',
-                        data: imageBase64
-                      }
-                    }
-                  ]
-                }
-              ]
+              contents: [{ parts }]
             })
           });
 
@@ -248,8 +246,8 @@ router.post('/submit', requireAuth, (req, res) => {
   } = req.body;
 
   // Validate inputs
-  if (!imageUrl || latitude === undefined || longitude === undefined) {
-    return res.status(400).json({ error: 'Image URL, latitude, and longitude are required.' });
+  if (latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ error: 'Latitude and longitude coordinates are required.' });
   }
 
   if (!ai_problem || !ai_category || !ai_severity) {
