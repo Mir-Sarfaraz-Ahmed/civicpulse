@@ -11,7 +11,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   }
 });
 
-const BUCKET_NAME = 'civicpulse-uploads';
+const BUCKET_NAME = process.env.SUPABASE_STORAGE_BUCKET || process.env.VITE_SUPABASE_STORAGE_BUCKET || 'civicpusleai';
 
 /**
  * Creates an instance of Supabase client bound to a specific user's Bearer JWT

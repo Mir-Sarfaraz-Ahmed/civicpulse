@@ -12,8 +12,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-// Storage Bucket Name for Photos
-export const BUCKET_NAME = 'civicpulse-uploads';
+// Storage Bucket Name for Photos (matches Supabase dashboard bucket)
+export const BUCKET_NAME = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'civicpusleai';
 
 /**
  * Uploads an image file to Supabase Storage and returns its public URL

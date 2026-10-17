@@ -207,32 +207,38 @@ CREATE POLICY "Status history can be deleted by all"
   USING (true);
 
 -- ====================================================================
--- 6. Supabase Storage Bucket ('civicpulse-uploads')
+-- 6. Supabase Storage Bucket ('civicpusleai')
 -- ====================================================================
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('civicpulse-uploads', 'civicpulse-uploads', true)
+VALUES 
+  ('civicpusleai', 'civicpusleai', true),
+  ('civicpulse-uploads', 'civicpulse-uploads', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
 
--- Storage policies for civicpulse-uploads
+-- Storage policies for civicpusleai and civicpulse-uploads
 DROP POLICY IF EXISTS "Public Access to civicpulse-uploads" ON storage.objects;
-CREATE POLICY "Public Access to civicpulse-uploads"
+DROP POLICY IF EXISTS "Public Access to civicpulse storage" ON storage.objects;
+CREATE POLICY "Public Access to civicpulse storage"
   ON storage.objects FOR SELECT
-  USING (bucket_id = 'civicpulse-uploads');
+  USING (bucket_id IN ('civicpusleai', 'civicpulse-uploads'));
 
 DROP POLICY IF EXISTS "Allow Uploads to civicpulse-uploads" ON storage.objects;
-CREATE POLICY "Allow Uploads to civicpulse-uploads"
+DROP POLICY IF EXISTS "Allow Uploads to civicpulse storage" ON storage.objects;
+CREATE POLICY "Allow Uploads to civicpulse storage"
   ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'civicpulse-uploads');
+  WITH CHECK (bucket_id IN ('civicpusleai', 'civicpulse-uploads'));
 
 DROP POLICY IF EXISTS "Allow Updates to civicpulse-uploads" ON storage.objects;
-CREATE POLICY "Allow Updates to civicpulse-uploads"
+DROP POLICY IF EXISTS "Allow Updates to civicpulse storage" ON storage.objects;
+CREATE POLICY "Allow Updates to civicpulse storage"
   ON storage.objects FOR UPDATE
-  USING (bucket_id = 'civicpulse-uploads');
+  USING (bucket_id IN ('civicpusleai', 'civicpulse-uploads'));
 
 DROP POLICY IF EXISTS "Allow Deletes in civicpulse-uploads" ON storage.objects;
-CREATE POLICY "Allow Deletes in civicpulse-uploads"
+DROP POLICY IF EXISTS "Allow Deletes in civicpulse storage" ON storage.objects;
+CREATE POLICY "Allow Deletes in civicpulse storage"
   ON storage.objects FOR DELETE
-  USING (bucket_id = 'civicpulse-uploads');
+  USING (bucket_id IN ('civicpusleai', 'civicpulse-uploads'));
 
 -- ====================================================================
 -- Schema Setup Complete!
