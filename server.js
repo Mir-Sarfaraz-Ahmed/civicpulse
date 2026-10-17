@@ -35,8 +35,11 @@ app.use((req, res, next) => {
 // Mount Global JWT Authenticator
 app.use(authenticateToken);
 
-// Serve uploads statically
-app.use('/uploads', express.static(uploadsDir));
+// Optional static fallback for legacy local uploads if folder exists
+const legacyUploadsDir = path.join(__dirname, 'backend', 'uploads');
+if (fs.existsSync(legacyUploadsDir)) {
+  app.use('/uploads', express.static(legacyUploadsDir));
+}
 
 // Import Routers
 const authRouter = require('./backend/routes/auth');
