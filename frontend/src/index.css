@@ -1,9 +1,11 @@
 :root {
   --bg-main: #070913;
-  --bg-surface: rgba(16, 22, 40, 0.65);
-  --bg-surface-hover: rgba(25, 34, 60, 0.8);
-  --border-glow: rgba(0, 242, 254, 0.15);
-  --border-light: rgba(255, 255, 255, 0.07);
+  --bg-surface: linear-gradient(135deg, rgba(18, 24, 48, 0.86) 0%, rgba(9, 13, 28, 0.92) 100%);
+  --bg-surface-hover: linear-gradient(135deg, rgba(26, 36, 68, 0.90) 0%, rgba(13, 19, 40, 0.95) 100%);
+  --border-glow: rgba(0, 242, 254, 0.25);
+  --border-light: rgba(255, 255, 255, 0.12);
+  --border-specular: rgba(255, 255, 255, 0.22);
+  --glass-shadow: 0 18px 42px -10px rgba(0, 0, 0, 0.55), inset 0 1px 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 20px 0 rgba(0, 0, 0, 0.2);
   
   --primary-neon: #00f2fe;
   --secondary-neon: #9b51e0;
@@ -145,12 +147,12 @@ body {
 /* KPI Card style - Compact & Refined */
 .kpi-card {
   background: var(--bg-surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--border-light);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 12px 14px;
-  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
   transition: all var(--transition-speed);
   display: flex;
   flex-direction: column;
@@ -162,8 +164,8 @@ body {
 
 .kpi-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 242, 254, 0.35);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  border-color: rgba(0, 242, 254, 0.4);
+  box-shadow: 0 14px 32px -4px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 0 16px rgba(0, 242, 254, 0.15);
 }
 
 .kpi-label {
@@ -183,20 +185,21 @@ body {
   line-height: 1;
 }
 
-/* Glassmorphism Card style */
+/* Glassmorphism Card style - Rich Opaque Glass Vibe */
 .glass-card {
   background: var(--bg-surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
   border: 1px solid var(--border-light);
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 24px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: border-color var(--transition-speed), transform var(--transition-speed);
+  box-shadow: 0 18px 45px -10px rgba(0, 0, 0, 0.55), inset 0 1px 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 20px 0 rgba(0, 0, 0, 0.2);
+  transition: border-color var(--transition-speed), transform var(--transition-speed), box-shadow var(--transition-speed);
 }
 
 .glass-card:hover {
-  border-color: rgba(0, 242, 254, 0.25);
+  border-color: rgba(0, 242, 254, 0.35);
+  box-shadow: 0 22px 52px -8px rgba(0, 0, 0, 0.65), inset 0 1px 2px 0 rgba(255, 255, 255, 0.3), 0 0 22px 0 rgba(0, 242, 254, 0.12);
 }
 
 .glass-card-interactive {
@@ -206,7 +209,7 @@ body {
 .glass-card-interactive:hover {
   transform: translateY(-2px);
   border-color: var(--primary-neon);
-  box-shadow: var(--shadow-neon);
+  box-shadow: 0 22px 52px -8px rgba(0, 0, 0, 0.65), inset 0 1px 2px 0 rgba(255, 255, 255, 0.35), var(--shadow-neon);
 }
 
 /* Typography styles */
@@ -365,19 +368,21 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(255, 0, 85, 0.25);
 }
 
-/* Navigation Header */
+/* Navigation Header - Rich Opaque Glass Vibe */
 .navbar {
   min-height: 64px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--border-light);
-  background: rgba(7, 9, 19, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(14, 19, 38, 0.88) 0%, rgba(7, 10, 22, 0.94) 100%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   position: sticky;
   top: 0;
   z-index: 1000;
   width: 100%;
+  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.5), inset 0 -1px 0 0 rgba(255, 255, 255, 0.08);
+  transition: all var(--transition-speed) ease;
 }
 
 .nav-logo {

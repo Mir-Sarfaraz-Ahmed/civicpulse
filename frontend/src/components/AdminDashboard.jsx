@@ -361,14 +361,18 @@ export default function AdminDashboard({ token, user, onLogout, onBackToHome }) 
           padding: isScrolled ? '4px 0' : '10px 0', 
           display: 'flex',
           alignItems: 'center',
-          borderBottom: isScrolled ? '1px solid rgba(0, 242, 254, 0.2)' : '1px solid var(--border-light)', 
-          background: isScrolled ? 'rgba(7, 9, 19, 0.95)' : 'rgba(7, 9, 19, 0.88)', 
-          backdropFilter: 'blur(16px)', 
-          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: isScrolled ? '1px solid rgba(0, 242, 254, 0.25)' : '1px solid rgba(255, 255, 255, 0.12)', 
+          background: isScrolled 
+            ? 'linear-gradient(180deg, rgba(11, 15, 32, 0.95) 0%, rgba(5, 7, 18, 0.97) 100%)' 
+            : 'linear-gradient(180deg, rgba(14, 19, 38, 0.88) 0%, rgba(7, 10, 22, 0.94) 100%)', 
+          backdropFilter: 'blur(28px) saturate(180%)', 
+          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
           position: 'sticky', 
           top: 0, 
           zIndex: 1000,
-          boxShadow: isScrolled ? '0 4px 20px rgba(0,0,0,0.6), 0 0 10px rgba(0, 242, 254, 0.05)' : 'none',
+          boxShadow: isScrolled 
+            ? '0 8px 30px rgba(0,0,0,0.65), 0 0 15px rgba(0, 242, 254, 0.1), inset 0 -1px 0 rgba(255, 255, 255, 0.08)' 
+            : '0 8px 32px -4px rgba(0, 0, 0, 0.5), inset 0 -1px 0 0 rgba(255, 255, 255, 0.08)',
           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
       >

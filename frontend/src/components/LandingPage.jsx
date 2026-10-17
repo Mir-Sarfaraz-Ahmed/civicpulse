@@ -95,7 +95,23 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
 
       {/* 2. Hero Section */}
       <section className="hero container">
-        <div style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(0, 242, 254, 0.08)', border: '1px solid rgba(0, 242, 254, 0.3)', padding: '6px 16px', borderRadius: '30px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary-neon)', letterSpacing: '0.06em', marginBottom: '22px', whiteSpace: 'nowrap' }}>
+        <div style={{ 
+          display: 'inline-flex', 
+          alignItems: 'center', 
+          background: 'linear-gradient(135deg, rgba(14, 20, 42, 0.88) 0%, rgba(8, 12, 26, 0.94) 100%)', 
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(0, 242, 254, 0.35)', 
+          padding: '7px 20px', 
+          borderRadius: '30px', 
+          fontSize: '0.78rem', 
+          fontWeight: 600, 
+          color: 'var(--primary-neon)', 
+          letterSpacing: '0.06em', 
+          marginBottom: '22px', 
+          whiteSpace: 'nowrap',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.2)' 
+        }}>
           NEXT-GEN CIVIC INTELLIGENCE PLATFORM
         </div>
         <h1 className="text-gradient" style={{ fontSize: 'clamp(2.2rem, 5.2vw, 3.6rem)', marginBottom: '18px', lineHeight: 1.16, letterSpacing: '-0.025em' }}>
@@ -124,8 +140,19 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
 
       {/* 3. Core Value Proposition Banner */}
       <section className="container" style={{ marginTop: '28px', marginBottom: '64px' }}>
-        <div className="glass-card flex-row-center" style={{ padding: '22px 32px', textAlign: 'center', borderColor: 'rgba(155, 81, 224, 0.25)', maxWidth: '980px', margin: '0 auto' }}>
-          <h3 style={{ fontSize: 'clamp(1rem, 2vw, 1.2rem)', fontWeight: 500, color: 'var(--text-main)', lineHeight: 1.55 }}>
+        <div 
+          className="glass-card flex-row-center" 
+          style={{ 
+            padding: '22px 34px', 
+            textAlign: 'center', 
+            borderColor: 'rgba(155, 81, 224, 0.35)', 
+            maxWidth: '980px', 
+            margin: '0 auto',
+            borderRadius: '20px',
+            boxShadow: '0 20px 48px -10px rgba(0, 0, 0, 0.65), inset 0 1px 1px 0 rgba(255, 255, 255, 0.25), 0 0 32px rgba(155, 81, 224, 0.12)' 
+          }}
+        >
+          <h3 style={{ fontSize: 'clamp(1rem, 2vw, 1.22rem)', fontWeight: 500, color: 'var(--text-main)', lineHeight: 1.55 }}>
             ⚡ <span className="neon-text" style={{ fontWeight: 700 }}>CivicPulse AI</span> converts raw complaints into structured, prioritized, actionable urban intelligence.
           </h3>
         </div>
@@ -207,7 +234,17 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
             </ul>
           </div>
           
-          <div className="flex-row-center" style={{ background: 'rgba(10,15,30,0.65)', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '32px 24px', flexDirection: 'column', width: '100%' }}>
+          <div className="flex-row-center" style={{ 
+            background: 'linear-gradient(135deg, rgba(14, 19, 40, 0.88) 0%, rgba(7, 10, 22, 0.94) 100%)', 
+            backdropFilter: 'blur(24px)', 
+            WebkitBackdropFilter: 'blur(24px)', 
+            border: '1px solid rgba(255, 255, 255, 0.12)', 
+            borderRadius: '16px', 
+            padding: '32px 24px', 
+            flexDirection: 'column', 
+            width: '100%',
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.18)' 
+          }}>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap', justifyContent: 'center' }}>
               <span className="badge badge-critical" style={{ whiteSpace: 'nowrap' }}>Critical Severity (50)</span>
               <span style={{ color: 'var(--text-muted)', alignSelf: 'center' }}>+</span>
