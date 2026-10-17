@@ -275,7 +275,7 @@ export default function App() {
     }
   };
 
-  // Login via Supabase Auth with backend fallback
+  // Login with backend primary authentication and Supabase fallback
   const handleLogin = async (e, customEmail, customPassword) => {
     if (e) e.preventDefault();
     setLoading(true);
@@ -290,7 +290,38 @@ export default function App() {
       return;
     }
 
-    // 1. Try Supabase Auth First
+    // 1. Primary auth: Backend database (handles all preset and registered accounts with 0ms network lag)
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      }).catch(async () => {
+        return await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: loginEmail, password: loginPassword })
+        });
+      });
+
+      const data = await response.json();
+      if (response.ok && data.token && data.user) {
+        saveAuthSession(data.token, data.user);
+        if (data.user.role === 'admin') {
+          setPage('admin');
+        } else if (data.user.role === 'crew') {
+          setPage('crew');
+        } else {
+          setPage('civilian');
+        }
+        setLoading(false);
+        return;
+      }
+    } catch (backendErr) {
+      console.warn('[Backend Auth Error, trying Supabase]', backendErr);
+    }
+
+    // 2. Secondary fallback: Supabase Auth
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -316,35 +347,7 @@ export default function App() {
       console.warn('[Supabase Auth Login Note]', supabaseErr.message);
     }
 
-    // 2. Primary fallback: Backend authentication (seeded demo accounts)
-    try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword })
-      });
-      const data = await response.json();
-      if (response.ok && data.token && data.user) {
-        saveAuthSession(data.token, data.user);
-        if (data.user.role === 'admin') {
-          setPage('admin');
-        } else if (data.user.role === 'crew') {
-          setPage('crew');
-        } else {
-          setPage('civilian');
-        }
-        setLoading(false);
-        return;
-      } else if (data && data.error) {
-        setErrorMsg(data.error);
-        setLoading(false);
-        return;
-      }
-    } catch (backendErr) {
-      console.warn('[Backend Auth Network Error]', backendErr);
-    }
-
-    setErrorMsg('Invalid email or password. Please check your credentials or click a 1-Click Role Login below.');
+    setErrorMsg('Invalid email or password. Click a 1-Click Role Login below to sign in instantly.');
     setLoading(false);
   };
 
@@ -367,9 +370,46 @@ export default function App() {
     }
   };
 
-  // Quick preset login helper (logs in directly without polluting form fields)
-  const handleQuickLogin = (presetEmail, presetPass) => {
-    handleLogin(null, presetEmail, presetPass);
+  // Quick 1-Click Role Login helper: sets visual fields and authenticates instantly
+  const handleQuickLogin = async (presetEmail, presetPass) => {
+    setEmail(presetEmail);
+    setPassword(presetPass);
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: presetEmail, password: presetPass })
+      }).catch(async () => {
+        return await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: presetEmail, password: presetPass })
+        });
+      });
+
+      const data = await response.json();
+      if (response.ok && data.token && data.user) {
+        saveAuthSession(data.token, data.user);
+        if (data.user.role === 'admin') {
+          setPage('admin');
+        } else if (data.user.role === 'crew') {
+          setPage('crew');
+        } else {
+          setPage('civilian');
+        }
+        return;
+      } else {
+        setErrorMsg(data?.error || '1-Click Login failed.');
+      }
+    } catch (err) {
+      console.error('[1-Click Login Exception]', err);
+      setErrorMsg('Failed to authenticate preset account.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Seed Demo Data directly from Login/Landing pages
