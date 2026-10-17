@@ -280,7 +280,7 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           <div style={{ fontSize: '0.85rem', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             <a href="#terms" onClick={(e) => { e.preventDefault(); }} style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>Terms</a>
             <a href="#privacy" onClick={(e) => { e.preventDefault(); }} style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>Privacy Policy</a>
-            <a href="#authority" onClick={(e) => { e.preventDefault(); onNavigate('login', { defaultAdmin: true }); }} style={{ color: 'var(--primary-neon)', textDecoration: 'none', fontWeight: 600 }}>Authority Login</a>
+            <a href="#authority" onClick={(e) => { e.preventDefault(); onNavigate('login'); }} style={{ color: 'var(--primary-neon)', textDecoration: 'none', fontWeight: 600 }}>Authority Login</a>
           </div>
         </div>
       </footer>

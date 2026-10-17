@@ -171,19 +171,13 @@ export default function App() {
     };
   }, []);
 
-  const handleNavigate = (targetPage, options = {}) => {
+  const handleNavigate = (targetPage) => {
     setErrorMsg(null);
-    if (!options.keepSuccess) setSuccessMsg(null);
+    setSuccessMsg(null);
+    setEmail('');
+    setPassword('');
+    setName('');
     setPage(targetPage);
-    
-    if (targetPage === 'login') {
-      if (!options.keepEmail) {
-        setEmail('');
-        setPassword('');
-      } else {
-        setPassword('');
-      }
-    }
   };
 
   const handleLogout = async () => {
@@ -373,10 +367,8 @@ export default function App() {
     }
   };
 
-  // Quick preset login helper
+  // Quick preset login helper (logs in directly without polluting form fields)
   const handleQuickLogin = (presetEmail, presetPass) => {
-    setEmail(presetEmail);
-    setPassword(presetPass);
     handleLogin(null, presetEmail, presetPass);
   };
 
@@ -392,8 +384,6 @@ export default function App() {
       const data = await response.json();
       if (response.ok) {
         setSuccessMsg('Demo database seeded successfully with all lifecycle stages!');
-        setEmail('admin@gmail.com');
-        setPassword('31102006');
       } else {
         setErrorMsg(data.error || 'Seeding failed.');
       }
@@ -545,7 +535,11 @@ export default function App() {
               <div style={{ flex: 1, height: '1px', background: 'var(--border-light)' }} />
             </div>
 
-            <form onSubmit={page === 'login' ? (e) => handleLogin(e) : handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form 
+              onSubmit={page === 'login' ? (e) => handleLogin(e) : handleRegister} 
+              autoComplete="off"
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
               {page === 'register' && (
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Full Name</label>
@@ -555,6 +549,7 @@ export default function App() {
                     value={name} 
                     onChange={(e) => setName(e.target.value)} 
                     className="form-input" 
+                    autoComplete="off"
                     required 
                   />
                 </div>
@@ -564,10 +559,15 @@ export default function App() {
                 <label className="form-label">Email Address</label>
                 <input 
                   type="email" 
+                  name="civic_user_email"
                   placeholder="name@domain.com" 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   className="form-input" 
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
                   required 
                 />
               </div>
@@ -576,10 +576,12 @@ export default function App() {
                 <label className="form-label">Password</label>
                 <input 
                   type="password" 
+                  name="civic_user_password"
                   placeholder="••••••••" 
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   className="form-input" 
+                  autoComplete="new-password"
                   required 
                 />
               </div>
