@@ -1,11 +1,15 @@
 import React from 'react';
 import { Eye, Flame, ArrowRight, Zap, BarChart2 } from 'lucide-react';
 import { GlassFold } from './ui/glass-fold';
+import { GlassEffect, GlassFilter } from './ui/liquid-glass';
 
 export default function LandingPage({ onNavigate, user, onLogout }) {
   return (
     <div className="landing-page" style={{ position: 'relative', minHeight: '100vh', paddingBottom: '70px', overflowX: 'hidden' }}>
       
+      {/* SVG Liquid Glass Refractive Filter */}
+      <GlassFilter />
+
       {/* GlassFold Animated WebGL Background Layer */}
       <div 
         style={{ 
@@ -160,7 +164,10 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
 
       {/* 4. Core Problems & AI Solutions */}
       <section className="container grid-2" style={{ marginBottom: '72px', gap: '28px' }}>
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', height: '100%' }}>
+        <GlassEffect 
+          style={{ padding: '30px', height: '100%', borderColor: 'rgba(255, 0, 85, 0.3)' }}
+          glowColor="rgba(255, 0, 85, 0.12)"
+        >
           <div style={{ background: 'rgba(255, 0, 85, 0.1)', color: 'var(--color-critical)', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', border: '1px solid rgba(255, 0, 85, 0.25)' }}>
             <Flame size={24} />
           </div>
@@ -168,9 +175,12 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.65 }}>
             Traditional complaint forms store unstructured reports in endless queues. They fail to understand what the issue is, ignore physical proximity duplicates, and provide no logical prioritization. As a result, critical safety hazards remain unaddressed for weeks while trivial complaints jam the system.
           </p>
-        </div>
+        </GlassEffect>
 
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', height: '100%', borderColor: 'rgba(0, 242, 254, 0.25)' }}>
+        <GlassEffect 
+          style={{ padding: '30px', height: '100%', borderColor: 'rgba(0, 242, 254, 0.35)' }}
+          glowColor="rgba(0, 242, 254, 0.15)"
+        >
           <div style={{ background: 'rgba(0, 242, 254, 0.1)', color: 'var(--primary-neon)', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', border: '1px solid rgba(0, 242, 254, 0.25)' }}>
             <Eye size={24} />
           </div>
@@ -178,7 +188,7 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.65 }}>
             CivicPulse feeds photos and descriptions directly into an AI model for category and severity detection. A mathematical engine calculates a priority score (0–100) based on location risks, while a spatial clustering algorithm automatically groups multiple citizen reports into a single, unified civic incident.
           </p>
-        </div>
+        </GlassEffect>
       </section>
 
       {/* 5. How It Works - Step Workflow */}
@@ -188,75 +198,77 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
         </h2>
         
         <div className="grid-3" style={{ gap: '24px' }}>
-          <div className="glass-card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <GlassEffect style={{ padding: '28px 22px', textAlign: 'center', height: '100%' }}>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary-neon)', marginBottom: '10px', lineHeight: 1 }}>01</div>
             <h3 style={{ fontSize: '1.15rem', marginBottom: '10px', fontWeight: 700 }}>Citizen Submission</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6 }}>
               Upload or snap a photo of the incident, write a description, and select the location on our interactive Delhi map.
             </p>
-          </div>
+          </GlassEffect>
 
-          <div className="glass-card" style={{ textAlign: 'center', borderColor: 'rgba(155,81,224,0.25)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <GlassEffect style={{ padding: '28px 22px', textAlign: 'center', height: '100%', borderColor: 'rgba(155,81,224,0.35)' }} glowColor="rgba(155, 81, 224, 0.15)">
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--secondary-neon)', marginBottom: '10px', lineHeight: 1 }}>02</div>
             <h3 style={{ fontSize: '1.15rem', marginBottom: '10px', fontWeight: 700 }}>Multimodal AI Scan</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6 }}>
               The server sends assets to Gemini AI to extract the issue class, verify severity, and generate structured summaries.
             </p>
-          </div>
+          </GlassEffect>
 
-          <div className="glass-card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <GlassEffect style={{ padding: '28px 22px', textAlign: 'center', height: '100%' }}>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--primary-neon)', marginBottom: '10px', lineHeight: 1 }}>03</div>
             <h3 style={{ fontSize: '1.15rem', marginBottom: '10px', fontWeight: 700 }}>Priority & Grouping</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6 }}>
               The backend groups coordinates within 100 meters, computes the 0–100 priority score, and alerts the admin team.
             </p>
-          </div>
+          </GlassEffect>
         </div>
       </section>
 
       {/* 6. Highlight: Math Priority Engine */}
       <section className="container" style={{ marginBottom: '72px' }}>
-        <div className="glass-card grid-2" style={{ alignItems: 'center', padding: 'clamp(24px, 4vw, 40px)', gap: '32px' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--primary-neon)', fontSize: '0.82rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>
-              <BarChart2 size={16} /> Deterministic Priority Algorithm
+        <GlassEffect style={{ padding: 'clamp(24px, 4vw, 40px)' }}>
+          <div className="grid-2" style={{ alignItems: 'center', gap: '32px' }}>
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--primary-neon)', fontSize: '0.82rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>
+                <BarChart2 size={16} /> Deterministic Priority Algorithm
+              </div>
+              <h2 style={{ fontSize: 'clamp(1.6rem, 3vw, 2.1rem)', marginBottom: '16px', lineHeight: 1.25, fontWeight: 700 }}>
+                Priority scores calculated on factors, not guesses
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.65, marginBottom: '20px' }}>
+                Our proprietary scoring system calculates priority scores dynamically using structured metrics rather than qualitative models:
+              </p>
+              <ul style={{ color: 'var(--text-muted)', fontSize: '0.9rem', paddingLeft: '20px', lineHeight: 1.8 }}>
+                <li><strong style={{ color: 'var(--text-main)' }}>Base Weights</strong>: Assigned by problem category and detected severity level.</li>
+                <li><strong style={{ color: 'var(--text-main)' }}>Vulnerability Multiplier</strong>: Boosts score by 10 points if near metro stations, hospitals, schools, or highways.</li>
+                <li><strong style={{ color: 'var(--text-main)' }}>Citizen Count Bonus</strong>: Increments priority as duplicate reports cluster, emphasizing popular concerns.</li>
+              </ul>
             </div>
-            <h2 style={{ fontSize: 'clamp(1.6rem, 3vw, 2.1rem)', marginBottom: '16px', lineHeight: 1.25, fontWeight: 700 }}>
-              Priority scores calculated on factors, not guesses
-            </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.65, marginBottom: '20px' }}>
-              Our proprietary scoring system calculates priority scores dynamically using structured metrics rather than qualitative models:
-            </p>
-            <ul style={{ color: 'var(--text-muted)', fontSize: '0.9rem', paddingLeft: '20px', lineHeight: 1.8 }}>
-              <li><strong style={{ color: 'var(--text-main)' }}>Base Weights</strong>: Assigned by problem category and detected severity level.</li>
-              <li><strong style={{ color: 'var(--text-main)' }}>Vulnerability Multiplier</strong>: Boosts score by 10 points if near metro stations, hospitals, schools, or highways.</li>
-              <li><strong style={{ color: 'var(--text-main)' }}>Citizen Count Bonus</strong>: Increments priority as duplicate reports cluster, emphasizing popular concerns.</li>
-            </ul>
+            
+            <div className="flex-row-center" style={{ 
+              background: 'linear-gradient(135deg, rgba(14, 19, 40, 0.88) 0%, rgba(7, 10, 22, 0.94) 100%)', 
+              backdropFilter: 'blur(24px)', 
+              WebkitBackdropFilter: 'blur(24px)', 
+              border: '1px solid rgba(255, 255, 255, 0.12)', 
+              borderRadius: '16px', 
+              padding: '32px 24px', 
+              flexDirection: 'column', 
+              width: '100%',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.18)' 
+            }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <span className="badge badge-critical" style={{ whiteSpace: 'nowrap' }}>Critical Severity (50)</span>
+                <span style={{ color: 'var(--text-muted)', alignSelf: 'center' }}>+</span>
+                <span className="badge badge-low" style={{ background: 'rgba(0, 242, 254, 0.1)', color: 'var(--primary-neon)', border: '1px solid rgba(0, 242, 254, 0.3)', whiteSpace: 'nowrap' }}>Road Infra (25)</span>
+              </div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '8px', textAlign: 'center' }}>Proximity: School (+10) | Duplicates: 3 (+10)</div>
+              <div className="priority-circle text-gradient pulse-glow" style={{ width: '110px', height: '110px', fontSize: '2.4rem', border: '2px solid var(--primary-neon)', boxShadow: '0 0 25px rgba(0, 242, 254, 0.25)', margin: '14px 0' }}>
+                95
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '0.02em' }}>Civic Priority Score</div>
+            </div>
           </div>
-          
-          <div className="flex-row-center" style={{ 
-            background: 'linear-gradient(135deg, rgba(14, 19, 40, 0.88) 0%, rgba(7, 10, 22, 0.94) 100%)', 
-            backdropFilter: 'blur(24px)', 
-            WebkitBackdropFilter: 'blur(24px)', 
-            border: '1px solid rgba(255, 255, 255, 0.12)', 
-            borderRadius: '16px', 
-            padding: '32px 24px', 
-            flexDirection: 'column', 
-            width: '100%',
-            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.18)' 
-          }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <span className="badge badge-critical" style={{ whiteSpace: 'nowrap' }}>Critical Severity (50)</span>
-              <span style={{ color: 'var(--text-muted)', alignSelf: 'center' }}>+</span>
-              <span className="badge badge-low" style={{ background: 'rgba(0, 242, 254, 0.1)', color: 'var(--primary-neon)', border: '1px solid rgba(0, 242, 254, 0.3)', whiteSpace: 'nowrap' }}>Road Infra (25)</span>
-            </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '8px', textAlign: 'center' }}>Proximity: School (+10) | Duplicates: 3 (+10)</div>
-            <div className="priority-circle text-gradient pulse-glow" style={{ width: '110px', height: '110px', fontSize: '2.4rem', border: '2px solid var(--primary-neon)', boxShadow: '0 0 25px rgba(0, 242, 254, 0.25)', margin: '14px 0' }}>
-              95
-            </div>
-            <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '0.02em' }}>Civic Priority Score</div>
-          </div>
-        </div>
+        </GlassEffect>
       </section>
 
       {/* 7. Footer */}
