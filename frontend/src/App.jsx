@@ -281,8 +281,12 @@ export default function App() {
     setLoading(true);
     setErrorMsg(null);
 
-    const loginEmail = (customEmail || email).trim();
+    let loginEmail = (customEmail || email).trim().toLowerCase();
     const loginPassword = customPassword || password;
+
+    if (loginEmail === 'admin' || loginEmail === 'administrator') loginEmail = 'admin@gmail.com';
+    if (loginEmail === 'crew' || loginEmail === 'dispatch') loginEmail = 'crew@gmail.com';
+    if (loginEmail === 'citizen' || loginEmail === 'civilian') loginEmail = 'citizen@gmail.com';
 
     if (!loginEmail || !loginPassword) {
       setErrorMsg('Email and password are required.');
