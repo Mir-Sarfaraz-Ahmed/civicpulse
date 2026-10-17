@@ -131,7 +131,7 @@ function initDb() {
       },
       {
         email: 'crew@gmail.com',
-        password: '311102006',
+        password: '31102006',
         role: 'crew',
         name: 'Rapid Response Dispatch Crew'
       },

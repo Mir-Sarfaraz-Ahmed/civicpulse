@@ -52,7 +52,7 @@ router.post('/seed', (req, res) => {
 
     const hashCivilian = bcrypt.hashSync('31102006', 10);
     const hashAdmin = bcrypt.hashSync('31102006', 10);
-    const hashCrew = bcrypt.hashSync('311102006', 10);
+    const hashCrew = bcrypt.hashSync('31102006', 10);
 
     query.run(
       'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
