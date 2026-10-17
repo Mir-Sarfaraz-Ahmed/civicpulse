@@ -275,7 +275,7 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
       <footer style={{ borderTop: '1px solid var(--border-light)', paddingTop: '28px', marginTop: '48px' }}>
         <div className="container flex-row-between" style={{ flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            &copy; 2026 CivicPulse AI. Developed by <strong>the Predators</strong>.
+            &copy; 2026 CivicPulse AI. Developed by <strong>Apex Eagles</strong>.
           </div>
           <div style={{ fontSize: '0.85rem', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             <a href="#terms" onClick={(e) => { e.preventDefault(); }} style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>Terms</a>
