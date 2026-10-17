@@ -41,17 +41,26 @@ const { query } = require('../db');
 
 // Upsert user into local SQLite database so foreign keys (reports, history) always resolve
 function ensureUserInDb(user) {
-  if (!user || !user.id) return;
+  if (!user || !user.id || !user.email) return;
   try {
     const existing = query.get('SELECT id FROM users WHERE id = ?', [user.id]);
     if (!existing) {
       // Check if same email exists with different ID (e.g. from previous demo seeder)
       const emailMatch = query.get('SELECT id FROM users WHERE email = ?', [user.email]);
       if (emailMatch) {
-        query.run(
-          'UPDATE users SET id = ?, name = ?, role = ? WHERE email = ?',
-          [user.id, user.name || user.email, user.role || 'civilian', user.email]
-        );
+        try {
+          query.run(
+            'UPDATE users SET id = ?, name = COALESCE(?, name), role = COALESCE(?, role) WHERE email = ?',
+            [user.id, user.name || user.email, user.role || 'civilian', user.email]
+          );
+        } catch (fkErr) {
+          // If FK on old id prevents updating id column, keep old id and update profile
+          query.run(
+            'UPDATE users SET name = COALESCE(?, name), role = COALESCE(?, role) WHERE id = ?',
+            [user.name || user.email, user.role || 'civilian', emailMatch.id]
+          );
+          user.dbId = emailMatch.id;
+        }
       } else {
         query.run(
           'INSERT INTO users (id, email, password_hash, role, name, created_at) VALUES (?, ?, NULL, ?, ?, ?)',

@@ -350,7 +350,7 @@ export default function App() {
       console.warn('[Backend Auth Network Error]', backendErr);
     }
 
-    setErrorMsg('Invalid email or password. Use demo password: 31102006 or click a 1-Click Role Login below.');
+    setErrorMsg('Invalid email or password. Please check your credentials or click a 1-Click Role Login below.');
     setLoading(false);
   };
 
@@ -620,9 +620,6 @@ export default function App() {
                   >
                     👤 Citizen
                   </button>
-                </div>
-                <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Password for all roles: <code style={{ color: 'var(--primary-neon)', background: 'rgba(0,242,254,0.1)', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(0,242,254,0.25)', fontWeight: 600 }}>31102006</code>
                 </div>
               </div>
             )}

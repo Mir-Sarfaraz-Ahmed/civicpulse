@@ -42,23 +42,55 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
   }, [modalImage, selectedReportId]);
 
   const fetchMyReports = useCallback(async () => {
+    const activeToken = token || localStorage.getItem('civicpulse_token');
     setLoadingList(true);
     setErrorMsg(null);
     try {
-      const response = await fetch(`${API_BASE}/reports/my-reports`, {
+      let response = await fetch(`${API_BASE}/reports/my-reports`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken || ''}`
         }
+      }).catch(async (fetchErr) => {
+        // Fallback to relative URL if custom origin failed
+        if (API_BASE.startsWith('http')) {
+          return await fetch('/api/reports/my-reports', {
+            headers: { 'Authorization': `Bearer ${activeToken || ''}` }
+          });
+        }
+        throw fetchErr;
       });
-      const data = await response.json();
-      if (response.ok) {
-        setReports(data);
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        if (response.ok) {
+          setReports(Array.isArray(data) ? data : []);
+        } else {
+          setErrorMsg(data.error || 'Failed to load reports.');
+        }
       } else {
-        setErrorMsg(data.error || 'Failed to load reports.');
+        const text = await response.text();
+        if (!response.ok) {
+          setErrorMsg(`Failed to load reports (Status ${response.status}).`);
+        } else {
+          setReports([]);
+        }
       }
     } catch (err) {
-      console.error(err);
+      console.warn('[CivilianPortal] Note while fetching citizen reports:', err.message);
+      // Try direct relative endpoint as final fallback
+      try {
+        const relRes = await fetch('/api/reports/my-reports', {
+          headers: { 'Authorization': `Bearer ${activeToken || ''}` }
+        });
+        if (relRes.ok) {
+          const relData = await relRes.json();
+          setReports(Array.isArray(relData) ? relData : []);
+          return;
+        }
+      } catch (e) {}
       setErrorMsg('Network error fetching reports.');
+      setReports([]);
     } finally {
       setLoadingList(false);
     }

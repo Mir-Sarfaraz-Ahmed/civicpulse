@@ -35,68 +35,73 @@ function getAuthenticatedClient(token) {
 /**
  * Validates a Supabase JWT token and extracts user profile
  * @param {string} token 
- * @returns {Promise<{id: string, email: string, role: string, name: string}|null>}
+ * @returns {Promise<{id: string, email: string, role: string, name: string, avatar?: string}|null>}
  */
 async function getUserFromToken(token) {
   if (!token) return null;
+
+  // Fast Path: Parse JWT payload directly (instant, zero network latency, resilient against cloud timeouts)
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-      // Fallback: parse JWT payload directly if network call fails or token expired
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-          if (payload.sub && payload.email) {
-            return {
-              id: payload.sub,
-              email: payload.email,
-              role: payload.user_metadata?.role || payload.role || (payload.email.includes('admin') ? 'admin' : (payload.email.includes('crew') ? 'crew' : 'civilian')),
-              name: payload.user_metadata?.full_name || payload.user_metadata?.name || payload.name || payload.email.split('@')[0],
-              avatar: payload.user_metadata?.avatar_url || payload.user_metadata?.picture || null
-            };
-          }
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+      const isSupabaseToken = (payload.iss && payload.iss.includes('supabase')) || payload.aud === 'authenticated' || (payload.sub && payload.email);
+      
+      if (isSupabaseToken && payload.sub && payload.email) {
+        const normalizedEmail = payload.email.toLowerCase().trim();
+        let role = payload.user_metadata?.role || payload.role;
+        
+        if (!role) {
+          if (normalizedEmail === 'admin@gmail.com' || normalizedEmail.includes('admin')) role = 'admin';
+          else if (normalizedEmail === 'crew@gmail.com' || normalizedEmail.includes('crew')) role = 'crew';
+          else role = 'civilian';
         }
-      } catch (e) {}
-      return null;
+
+        const name = payload.user_metadata?.full_name || payload.user_metadata?.name || payload.name || payload.email.split('@')[0];
+        const avatar = payload.user_metadata?.avatar_url || payload.user_metadata?.picture || null;
+
+        return {
+          id: payload.sub,
+          email: payload.email,
+          role: role,
+          name: name,
+          avatar: avatar
+        };
+      }
     }
-
-    // Attempt to fetch custom role from public.profiles
-    let role = user.user_metadata?.role;
-    let name = user.user_metadata?.full_name || user.user_metadata?.name;
-    const avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || null;
-
-    if (!role) {
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, name, avatar_url')
-          .eq('id', user.id)
-          .single();
-        if (profile) {
-          role = profile.role;
-          name = name || profile.name;
-        }
-      } catch (e) {}
-    }
-
-    if (!role) {
-      if (user.email === 'admin@gmail.com' || (user.email && user.email.includes('admin'))) role = 'admin';
-      else if (user.email === 'crew@gmail.com' || (user.email && user.email.includes('crew'))) role = 'crew';
-      else role = 'civilian';
-    }
-
-    return {
-      id: user.id,
-      email: user.email,
-      role: role,
-      name: name || user.email.split('@')[0],
-      avatar: avatar
-    };
-  } catch (err) {
-    console.warn('[Supabase Auth Validation Exception]', err.message);
-    return null;
+  } catch (parseErr) {
+    // Proceed to standard verification if parsing fails
   }
+
+  // Cloud Fallback: Query Supabase Auth API with 3-second timeout protection
+  try {
+    const getUserPromise = supabase.auth.getUser(token);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase getUser timeout')), 3000));
+    const result = await Promise.race([getUserPromise, timeoutPromise]);
+    
+    const user = result?.data?.user;
+    if (user && user.id && user.email) {
+      let role = user.user_metadata?.role;
+      if (!role) {
+        const email = user.email.toLowerCase();
+        if (email === 'admin@gmail.com' || email.includes('admin')) role = 'admin';
+        else if (email === 'crew@gmail.com' || email.includes('crew')) role = 'crew';
+        else role = 'civilian';
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        role: role,
+        name: user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0],
+        avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+      };
+    }
+  } catch (err) {
+    console.warn('[Supabase Auth Validation Notice]', err.message);
+  }
+
+  return null;
 }
 
 /**

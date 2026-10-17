@@ -333,15 +333,19 @@ router.post('/submit', requireAuth, (req, res) => {
 // Endpoint: GET /api/reports/my-reports
 router.get('/my-reports', requireAuth, (req, res) => {
   try {
+    const userId = req.user.id;
+    const dbId = req.user.dbId || userId;
+    const userEmail = req.user.email || '';
+
     const reports = query.all(
       `SELECT r.*, i.status, i.priority_score, i.assigned_worker, i.dispatch_notes, i.resolution_evidence_url, i.resolved_at, i.closed_at
        FROM reports r
        LEFT JOIN incidents i ON r.incident_id = i.id
-       WHERE r.citizen_id = ?
+       WHERE r.citizen_id = ? OR r.citizen_id = ? OR r.citizen_id IN (SELECT id FROM users WHERE email = ?)
        ORDER BY r.created_at DESC`,
-      [req.user.id]
+      [userId, dbId, userEmail]
     );
-    res.json(reports);
+    res.json(reports || []);
   } catch (err) {
     console.error('[Reports Error] Failed to fetch citizen reports:', err);
     res.status(500).json({ error: 'Internal server error.' });

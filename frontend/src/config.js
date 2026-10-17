@@ -1,8 +1,11 @@
 // In unified AI Studio deployment, backend and frontend share the same origin (port 3000)
 // If frontend is accessed directly via standalone vite port (e.g. 5173), route API to localhost:3000
 const getFallbackBackendUrl = () => {
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port !== '3000') {
-    return 'http://localhost:3000';
+  if (typeof window !== 'undefined') {
+    // If frontend is accessed directly via standalone vite port (e.g. 5173 or 3001), route API to backend port 3000
+    if (window.location.port && window.location.port !== '3000') {
+      return `${window.location.protocol}//${window.location.hostname}:3000`;
+    }
   }
   return '';
 };
