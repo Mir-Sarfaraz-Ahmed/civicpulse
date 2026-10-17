@@ -357,8 +357,8 @@ export default function AdminDashboard({ token, user, onLogout, onBackToHome }) 
       <header 
         className="navbar" 
         style={{ 
-          minHeight: isScrolled ? '46px' : '64px',
-          padding: isScrolled ? '4px 0' : '10px 0', 
+          minHeight: isScrolled ? '54px' : '64px',
+          padding: isScrolled ? '6px 0' : '10px 0', 
           display: 'flex',
           alignItems: 'center',
           borderBottom: isScrolled ? '1px solid rgba(0, 242, 254, 0.25)' : '1px solid rgba(255, 255, 255, 0.12)', 
@@ -413,159 +413,114 @@ export default function AdminDashboard({ token, user, onLogout, onBackToHome }) 
           {/* Controls Area */}
           <div style={{ display: 'flex', gap: isScrolled ? '6px' : '10px', alignItems: 'center', flexShrink: 0 }}>
             
-            {/* User Profile Badge */}
+            {/* User Profile Badge Box */}
             <div 
               title={user?.name || 'City Municipal Admin'}
               style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: isScrolled ? '0px' : '8px', 
-                background: isScrolled ? 'transparent' : 'rgba(16, 22, 40, 0.8)', 
-                border: isScrolled ? '1px solid transparent' : '1px solid var(--border-light)', 
-                padding: isScrolled ? '0px' : '5px 10px', 
-                borderRadius: isScrolled ? '50%' : '8px',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                gap: '8px', 
+                background: 'rgba(16, 22, 40, 0.85)', 
+                border: '1px solid var(--border-light)', 
+                padding: '5px 12px', 
+                borderRadius: '8px',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+                height: '34px'
               }}
             >
               <div 
                 style={{ 
-                  width: isScrolled ? '28px' : '28px', 
-                  height: isScrolled ? '28px' : '28px', 
+                  width: '24px', 
+                  height: '24px', 
                   borderRadius: '50%', 
                   background: 'linear-gradient(135deg, #ec4899, #be185d)', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   fontWeight: 700, 
-                  fontSize: isScrolled ? '0.78rem' : '0.8rem', 
+                  fontSize: '0.75rem', 
                   color: '#fff',
-                  boxShadow: isScrolled ? '0 0 8px rgba(236, 72, 153, 0.4)' : 'none',
-                  border: isScrolled ? '1.5px solid rgba(236, 72, 153, 0.7)' : 'none',
-                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                  lineHeight: 1,
+                  flexShrink: 0
                 }}
               >
-                {(user?.name || 'C').charAt(0).toUpperCase()}
+                {(user?.name || 'Admin').charAt(0).toUpperCase()}
               </div>
 
-              <div 
-                style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  lineHeight: 1.15,
-                  maxWidth: isScrolled ? '0px' : '220px',
-                  opacity: isScrolled ? 0 : 1,
-                  overflow: 'hidden',
-                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff' }}>{user?.name || 'Admin'}</span>
-                  <span style={{ fontSize: '0.62rem', background: '#e11d48', color: '#fff', padding: '1px 4px', borderRadius: '4px', fontWeight: 700, textTransform: 'uppercase' }}>
-                    ADMIN
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Verified Municipal Authority</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap' }}>
+                  {user?.name || 'Admin'}
+                </span>
+                <span style={{ fontSize: '0.62rem', background: '#e11d48', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  ADMIN
+                </span>
               </div>
             </div>
 
-            {/* Refresh Button */}
+            {/* Refresh Button Box */}
             <button 
               onClick={() => fetchDashboardData(true)} 
               className="btn btn-secondary" 
               title="Refresh Incident Feeds"
               style={{ 
-                padding: isScrolled ? '6px' : '6px 12px', 
-                fontSize: '0.8rem', 
-                display: 'flex', 
+                padding: '6px 14px', 
+                fontSize: '0.82rem', 
+                display: 'inline-flex', 
                 alignItems: 'center', 
-                gap: '5px', 
-                borderRadius: isScrolled ? '50%' : '8px',
-                minWidth: isScrolled ? '28px' : 'auto',
-                height: isScrolled ? '28px' : 'auto',
                 justifyContent: 'center',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                gap: '6px', 
+                borderRadius: '8px',
+                height: '34px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
-              <RefreshCw size={13} />
-              <span 
-                style={{ 
-                  maxWidth: isScrolled ? '0px' : '60px', 
-                  opacity: isScrolled ? 0 : 1, 
-                  overflow: 'hidden', 
-                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', 
-                  whiteSpace: 'nowrap' 
-                }}
-              >
-                Refresh
-              </span>
+              <RefreshCw size={14} style={{ flexShrink: 0 }} />
+              <span>Refresh</span>
             </button>
 
-            {/* Home Button */}
+            {/* Home Button Box */}
             <button 
               onClick={onBackToHome} 
               className="btn btn-secondary" 
               title="Return to Home Portal"
               style={{ 
-                padding: isScrolled ? '6px' : '6px 12px', 
-                fontSize: '0.8rem', 
-                display: 'flex', 
+                padding: '6px 14px', 
+                fontSize: '0.82rem', 
+                display: 'inline-flex', 
                 alignItems: 'center', 
-                gap: '5px', 
-                borderRadius: isScrolled ? '50%' : '8px',
-                minWidth: isScrolled ? '28px' : 'auto',
-                height: isScrolled ? '28px' : 'auto',
                 justifyContent: 'center',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                gap: '6px', 
+                borderRadius: '8px',
+                height: '34px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
-              <Home size={13} />
-              <span 
-                style={{ 
-                  maxWidth: isScrolled ? '0px' : '50px', 
-                  opacity: isScrolled ? 0 : 1, 
-                  overflow: 'hidden', 
-                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', 
-                  whiteSpace: 'nowrap' 
-                }}
-              >
-                Home
-              </span>
+              <Home size={14} style={{ flexShrink: 0 }} />
+              <span>Home</span>
             </button>
 
-            {/* Sign Out Button */}
+            {/* Sign Out Button Box */}
             <button 
               onClick={onLogout} 
-              className="btn" 
+              className="btn btn-danger" 
               title="Sign Out of Authority Console"
               style={{ 
-                padding: isScrolled ? '6px' : '6px 12px', 
-                fontSize: '0.8rem', 
-                border: '1px solid rgba(225, 29, 72, 0.5)', 
-                background: 'rgba(225, 29, 72, 0.1)', 
-                color: '#fb7185', 
-                display: 'flex', 
+                padding: '6px 14px', 
+                fontSize: '0.82rem', 
+                display: 'inline-flex', 
                 alignItems: 'center', 
-                gap: '5px', 
-                borderRadius: isScrolled ? '50%' : '8px',
-                minWidth: isScrolled ? '28px' : 'auto',
-                height: isScrolled ? '28px' : 'auto',
                 justifyContent: 'center',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                gap: '6px', 
+                borderRadius: '8px',
+                height: '34px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
-              <LogOut size={13} />
-              <span 
-                style={{ 
-                  maxWidth: isScrolled ? '0px' : '70px', 
-                  opacity: isScrolled ? 0 : 1, 
-                  overflow: 'hidden', 
-                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', 
-                  whiteSpace: 'nowrap' 
-                }}
-              >
-                Sign Out
-              </span>
+              <LogOut size={14} style={{ flexShrink: 0 }} />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
