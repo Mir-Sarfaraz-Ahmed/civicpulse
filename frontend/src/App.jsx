@@ -4,16 +4,31 @@ import LandingPage from './components/LandingPage';
 import CivilianPortal from './components/CivilianPortal';
 import AdminDashboard from './components/AdminDashboard';
 import CrewPortal from './components/CrewPortal';
-import { auth, db } from './firebaseClient';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  updateProfile 
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from './supabaseClient';
 import { API_BASE } from './config';
+
+function GoogleIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}>
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+      />
+    </svg>
+  );
+}
 
 export default function App() {
   const [page, setPage] = useState('landing'); // 'landing', 'login', 'register', 'civilian', 'admin', 'crew'
@@ -22,6 +37,7 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [seedingLoading, setSeedingLoading] = useState(false);
   const [clearingLoading, setClearingLoading] = useState(false);
 
@@ -30,34 +46,44 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
 
-  // Fetch actual assigned role from Firestore profile
-  const fetchUserRole = async (firebaseUser) => {
-    if (!firebaseUser) return 'civilian';
+  // Fetch actual assigned role from Supabase user metadata or public.profiles
+  const fetchUserRole = async (supabaseUser) => {
+    if (!supabaseUser) return 'civilian';
+    if (supabaseUser.user_metadata?.role) {
+      return supabaseUser.user_metadata.role;
+    }
     try {
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists() && userDoc.data()?.role) {
-        return userDoc.data().role;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', supabaseUser.id)
+        .single();
+      if (profile && profile.role) {
+        return profile.role;
       }
     } catch (err) {
-      console.warn('[Firestore] Could not load user role from doc:', err);
+      console.warn('[Supabase Profiles] Could not load user role from table:', err);
     }
+
+    const email = (supabaseUser.email || '').toLowerCase();
+    if (email.includes('admin')) return 'admin';
+    if (email.includes('crew')) return 'crew';
     return 'civilian';
   };
 
-  const resolveName = (firebaseUser) => {
-    if (!firebaseUser) return 'Citizen';
-    const metaName = firebaseUser.displayName;
+  const resolveName = (supabaseUser) => {
+    if (!supabaseUser) return 'Citizen';
+    const metaName = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name;
     if (metaName && metaName.trim() && !metaName.includes('@')) {
       return metaName.trim();
     }
     // Check locally saved name cache for this account
     try {
-      const cached = localStorage.getItem(`civicpulse_name_${firebaseUser.uid}`) || localStorage.getItem(`civicpulse_name_${firebaseUser.email}`);
+      const cached = localStorage.getItem(`civicpulse_name_${supabaseUser.id}`) || localStorage.getItem(`civicpulse_name_${supabaseUser.email}`);
       if (cached && cached.trim()) return cached.trim();
     } catch (e) {}
 
-    const emailPrefix = (firebaseUser.email || '').split('@')[0] || '';
+    const emailPrefix = (supabaseUser.email || '').split('@')[0] || '';
     if (emailPrefix) {
       const cleaned = emailPrefix.replace(/[._-]/g, ' ').replace(/\d+/g, '').replace(/pw$/i, '').trim();
       if (cleaned.length > 2) {
@@ -68,21 +94,36 @@ export default function App() {
     return 'Citizen';
   };
 
-  // Verify Firebase session on load — protect private pages
+  const resolveAvatar = (supabaseUser) => {
+    if (!supabaseUser) return null;
+    return supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture || null;
+  };
+
+  const navigateToRolePortal = (role) => {
+    if (role === 'admin') setPage('admin');
+    else if (role === 'crew') setPage('crew');
+    else setPage('civilian');
+  };
+
+  // Verify Supabase session on load — listen to auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        try {
-          const idToken = await currentUser.getIdToken();
-          const role = await fetchUserRole(currentUser);
-          const displayName = resolveName(currentUser);
-          setToken(idToken);
-          setUser({ id: currentUser.uid, email: currentUser.email, name: displayName, role });
-        } catch (err) {
-          console.error('[Firebase Auth] Failed to get token:', err);
+    // 1. Initial session load
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const isOAuthRedirect = window.location.hash.includes('access_token') || window.location.search.includes('code=');
+      if (session?.user) {
+        const role = await fetchUserRole(session.user);
+        const displayName = resolveName(session.user);
+        const avatar = resolveAvatar(session.user);
+        setToken(session.access_token);
+        const userObj = { id: session.user.id, email: session.user.email, name: displayName, role, avatar };
+        setUser(userObj);
+        saveAuthSession(session.access_token, userObj);
+
+        if (isOAuthRedirect) {
+          window.history.replaceState(null, '', window.location.pathname);
+          navigateToRolePortal(role);
         }
       } else {
-        // Check if there's a backend token in localStorage
         const storedToken = localStorage.getItem('civicpulse_token');
         const storedUser = localStorage.getItem('civicpulse_user');
         if (storedToken && storedUser) {
@@ -93,8 +134,30 @@ export default function App() {
             return;
           } catch (e) {}
         }
+        setToken(null);
+        setUser(null);
+      }
+    });
 
-        // No active session — clear any stale local data
+    // 2. Auth state subscription
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const role = await fetchUserRole(session.user);
+        const displayName = resolveName(session.user);
+        const avatar = resolveAvatar(session.user);
+        setToken(session.access_token);
+        const userObj = { id: session.user.id, email: session.user.email, name: displayName, role, avatar };
+        setUser(userObj);
+        saveAuthSession(session.access_token, userObj);
+
+        if (event === 'SIGNED_IN') {
+          const isOAuthRedirect = window.location.hash.includes('access_token') || window.location.search.includes('code=');
+          if (isOAuthRedirect) {
+            window.history.replaceState(null, '', window.location.pathname);
+            navigateToRolePortal(role);
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
         localStorage.removeItem('civicpulse_token');
         localStorage.removeItem('civicpulse_user');
         setToken(null);
@@ -103,7 +166,9 @@ export default function App() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleNavigate = (targetPage, options = {}) => {
@@ -123,9 +188,9 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
     } catch (e) {
-      console.error('[Firebase Auth] Sign out error:', e);
+      console.error('[Supabase Auth] Sign out error:', e);
     }
     localStorage.removeItem('civicpulse_token');
     localStorage.removeItem('civicpulse_user');
@@ -141,7 +206,7 @@ export default function App() {
     setUser(userObj);
   };
 
-  // Standard Email + Password Register — All new self-registered users are citizens
+  // Register with Supabase Auth — creates citizen account
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -151,68 +216,72 @@ export default function App() {
     const registerEmail = email.trim();
 
     try {
-      // 1. Register with backend
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: registerEmail, password, name: submittedName })
-      });
-      const data = await res.json();
-      
-      if (res.ok && data.token && data.user) {
-        saveAuthSession(data.token, data.user);
-        
-        // Optional: try to sync to Firestore users collection
-        try {
-          await setDoc(doc(db, 'users', data.user.id), {
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.name,
-            role: 'civilian',
-            created_at: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {
-          console.warn('[Firestore] Could not write user doc on register:', dbErr.message);
+      // 1. Supabase Auth Sign Up
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: registerEmail,
+        password: password,
+        options: {
+          data: {
+            name: submittedName,
+            role: 'civilian'
+          }
         }
+      });
+
+      if (authError) {
+        throw authError;
+      }
+
+      if (authData?.user) {
+        const accessToken = authData.session?.access_token || `session_${Date.now()}`;
+        const userObj = {
+          id: authData.user.id,
+          email: authData.user.email,
+          name: submittedName || resolveName(authData.user),
+          role: 'civilian'
+        };
+
+        saveAuthSession(accessToken, userObj);
+
+        // Also notify backend registration
+        try {
+          await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: registerEmail, password, name: submittedName })
+          });
+        } catch (e) {}
 
         setPage('civilian');
         return;
-      } else {
-        setErrorMsg(data.error || 'Registration failed.');
       }
     } catch (err) {
-      console.warn('[Register] Backend registration failed, attempting Firebase Auth fallback:', err);
-      // Fallback: Firebase Auth if backend is offline
+      console.warn('[Supabase Auth Register Note, attempting Backend sync]:', err.message);
+      // Fallback: Backend registration if Supabase had confirmation requirement
       try {
-        const userCredential = await createUserWithEmailAndPassword(auth, registerEmail, password);
-        const createdUser = userCredential.user;
-
-        if (submittedName) {
-          await updateProfile(createdUser, { displayName: submittedName });
-        }
-
-        const idToken = await createdUser.getIdToken();
-        const displayName = submittedName || resolveName(createdUser);
-        saveAuthSession(idToken, { id: createdUser.uid, email: createdUser.email, name: displayName, role: 'civilian' });
-        setPage('civilian');
-      } catch (authErr) {
-        console.error('[Registration Error]', authErr);
-        if (authErr.code === 'auth/email-already-in-use') {
-          setErrorMsg('Email address is already registered.');
-        } else if (authErr.code === 'auth/weak-password') {
-          setErrorMsg('Password must be at least 6 characters.');
-        } else if (authErr.code === 'auth/invalid-email') {
-          setErrorMsg('Invalid email address.');
+        const res = await fetch(`${API_BASE}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: registerEmail, password, name: submittedName })
+        });
+        const data = await res.json();
+        
+        if (res.ok && data.token && data.user) {
+          saveAuthSession(data.token, data.user);
+          setPage('civilian');
+          return;
         } else {
-          setErrorMsg('Registration failed. Please check your credentials.');
+          setErrorMsg(err.message || data.error || 'Registration failed.');
         }
+      } catch (fallbackErr) {
+        setErrorMsg(err.message || 'Registration failed. Please check your credentials.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Standard Email + Password Login (Civilian, Admin, or Crew)
+  // Login via Supabase Auth with backend fallback
   const handleLogin = async (e, customEmail, customPassword) => {
     if (e) e.preventDefault();
     setLoading(true);
@@ -227,9 +296,33 @@ export default function App() {
       return;
     }
 
-    let backendSuccess = false;
+    // 1. Try Supabase Auth First
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword
+      });
 
-    // 1. Primary auth: Backend database (handles all roles: admin, crew, civilian)
+      if (!authError && authData?.session) {
+        const sessionUser = authData.session.user;
+        const role = await fetchUserRole(sessionUser);
+        const displayName = resolveName(sessionUser);
+        const userObj = { id: sessionUser.id, email: sessionUser.email, name: displayName, role };
+        
+        saveAuthSession(authData.session.access_token, userObj);
+        
+        if (role === 'admin') setPage('admin');
+        else if (role === 'crew') setPage('crew');
+        else setPage('civilian');
+        
+        setLoading(false);
+        return;
+      }
+    } catch (supabaseErr) {
+      console.warn('[Supabase Auth Login Note]', supabaseErr.message);
+    }
+
+    // 2. Primary fallback: Backend authentication (seeded demo accounts)
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
@@ -238,7 +331,6 @@ export default function App() {
       });
       const data = await response.json();
       if (response.ok && data.token && data.user) {
-        backendSuccess = true;
         saveAuthSession(data.token, data.user);
         if (data.user.role === 'admin') {
           setPage('admin');
@@ -250,37 +342,34 @@ export default function App() {
         setLoading(false);
         return;
       } else if (data && data.error) {
-        // Backend actively validated and rejected the credentials
         setErrorMsg(data.error);
         setLoading(false);
         return;
       }
     } catch (backendErr) {
-      console.warn('[Backend Auth Network Error, checking Firebase Auth fallback]', backendErr);
+      console.warn('[Backend Auth Network Error]', backendErr);
     }
 
-    // 2. Secondary fallback: Firebase Auth (only if backend was unreachable)
-    if (!backendSuccess) {
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-        const sessionUser = userCredential.user;
-        const idToken = await sessionUser.getIdToken();
-        const role = await fetchUserRole(sessionUser);
-        const displayName = resolveName(sessionUser);
-        saveAuthSession(idToken, { id: sessionUser.uid, email: sessionUser.email, name: displayName, role });
-        if (role === 'admin') {
-          setPage('admin');
-        } else if (role === 'crew') {
-          setPage('crew');
-        } else {
-          setPage('civilian');
+    setErrorMsg('Invalid email or password.');
+    setLoading(false);
+  };
+
+  // Google OAuth Sign In via Supabase
+  const handleGoogleLogin = async () => {
+    try {
+      setGoogleLoading(true);
+      setErrorMsg(null);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
         }
-      } catch (authErr) {
-        console.warn('[Firebase Auth Fallback Notice]', authErr.code || authErr.message);
-        setErrorMsg('Invalid email or password.');
-      } finally {
-        setLoading(false);
-      }
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Google OAuth Error]:', err);
+      setErrorMsg(err.message || 'Failed to sign in with Google.');
+      setGoogleLoading(false);
     }
   };
 
@@ -406,6 +495,55 @@ export default function App() {
                 ✓ {successMsg}
               </div>
             )}
+
+            {/* Google OAuth One-Click Button */}
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading || googleLoading}
+              className="btn btn-secondary"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '11px 16px',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
+                color: '#fff',
+                borderRadius: '8px',
+                cursor: (loading || googleLoading) ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                marginBottom: '16px'
+              }}
+            >
+              {googleLoading ? (
+                <Loader style={{ animation: 'spin 1.5s infinite linear' }} size={18} />
+              ) : (
+                <>
+                  <GoogleIcon size={18} />
+                  <span>{page === 'login' ? 'Continue with Google' : 'Sign up with Google'}</span>
+                </>
+              )}
+            </button>
+
+            {/* Visual Divider */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '16px',
+              color: 'var(--text-muted)',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em'
+            }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-light)' }} />
+              <span style={{ padding: '0 12px' }}>or continue with email</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-light)' }} />
+            </div>
 
             <form onSubmit={page === 'login' ? (e) => handleLogin(e) : handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {page === 'register' && (

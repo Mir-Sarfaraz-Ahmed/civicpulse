@@ -64,8 +64,10 @@ function ensureUserInDb(user) {
   }
 }
 
-// Middleware to authenticate JWT (supports both local and Firebase tokens)
-function authenticateToken(req, res, next) {
+const { getUserFromToken } = require('../supabase');
+
+// Middleware to authenticate JWT (supports Supabase Auth, local JWTs, and Firebase tokens)
+async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
 
@@ -74,7 +76,19 @@ function authenticateToken(req, res, next) {
     return next();
   }
 
-  // Try 1: Verify with local JWT_SECRET (backend-issued tokens)
+  // Try 1: Supabase Auth Token Verification
+  try {
+    const supabaseUser = await getUserFromToken(token);
+    if (supabaseUser) {
+      req.user = supabaseUser;
+      ensureUserInDb(supabaseUser);
+      return next();
+    }
+  } catch (err) {
+    // Proceed to next fallback
+  }
+
+  // Try 2: Verify with local JWT_SECRET (backend-issued tokens)
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (!err && user) {
       req.user = user;
@@ -82,7 +96,7 @@ function authenticateToken(req, res, next) {
       return next();
     }
 
-    // Try 2: Decode as Firebase JWT
+    // Try 3: Decode as legacy Firebase JWT
     const firebaseUser = decodeFirebaseToken(token);
     if (firebaseUser) {
       req.user = firebaseUser;

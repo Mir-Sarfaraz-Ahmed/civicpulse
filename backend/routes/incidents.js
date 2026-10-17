@@ -5,11 +5,14 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { uploadToStorage } = require('../supabase');
+const { syncIncident, syncStatusHistory } = require('../supabaseSync');
 
 const router = express.Router();
 
-// Configure multer for resolution evidence upload
-const uploadsDir = path.join(__dirname, '..', 'uploads');
+// Configure multer for resolution evidence upload (uses /tmp on Vercel)
+const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const uploadsDir = isVercel ? path.join('/tmp', 'uploads') : path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -64,20 +67,39 @@ function logStatusChange(incidentId, status, changedBy, notes, actorName = null)
   try {
     const historyId = uuidv4();
     const actorId = changedBy || 'admin-system-id';
+    const now = new Date().toISOString();
 
     // Verify actor exists in DB to satisfy foreign key constraints
     const existing = query.get('SELECT id FROM users WHERE id = ?', [actorId]);
     if (!existing) {
       query.run(
         'INSERT OR IGNORE INTO users (id, email, password_hash, role, name, created_at) VALUES (?, ?, NULL, ?, ?, ?)',
-        [actorId, 'system@civilpulse.gov.in', 'admin', actorName || 'System Officer', new Date().toISOString()]
+        [actorId, 'system@civilpulse.gov.in', 'admin', actorName || 'System Officer', now]
       );
     }
 
     query.run(
       'INSERT INTO incident_status_history (id, incident_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [historyId, incidentId, status, actorId, notes || '', new Date().toISOString()]
+      [historyId, incidentId, status, actorId, notes || '', now]
     );
+
+    // Sync to Supabase status history
+    syncStatusHistory({
+      id: historyId,
+      incident_id: incidentId,
+      status,
+      changed_by: actorId,
+      notes: notes || '',
+      created_at: now
+    });
+
+    // Automatically sync updated incident state to Supabase PostgreSQL
+    try {
+      const updatedIncident = query.get('SELECT * FROM incidents WHERE id = ?', [incidentId]);
+      if (updatedIncident) {
+        syncIncident(updatedIncident);
+      }
+    } catch (e) {}
   } catch (err) {
     console.warn('[Status History Warning] Could not write audit log:', err.message);
   }
@@ -492,13 +514,23 @@ router.patch('/:id/crew-start', requireAuth, (req, res) => {
 });
 
 // PATCH /api/incidents/:id/crew-submit-resolution (Crew: Submit Resolution with Evidence Photo)
-router.patch('/:id/crew-submit-resolution', requireAuth, upload.single('evidence'), (req, res) => {
+router.patch('/:id/crew-submit-resolution', requireAuth, upload.single('evidence'), async (req, res) => {
   const incidentId = req.params.id;
   const { resolutionNotes, notes, evidenceUrl: providedUrl } = req.body;
 
   let finalEvidenceUrl = providedUrl;
   if (req.file) {
     finalEvidenceUrl = `/uploads/${req.file.filename}`;
+    try {
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const storageUrl = await uploadToStorage(fileBuffer, req.file.originalname, req.file.mimetype, 'resolutions');
+      if (storageUrl) {
+        finalEvidenceUrl = storageUrl;
+        console.log(`[Supabase Storage] Resolution evidence uploaded: ${finalEvidenceUrl}`);
+      }
+    } catch (storageErr) {
+      console.warn('[Supabase Storage Warning] Resolution evidence local fallback:', storageErr.message);
+    }
   }
 
   if (!finalEvidenceUrl) {
@@ -526,6 +558,17 @@ router.patch('/:id/crew-submit-resolution', requireAuth, upload.single('evidence
       `Resolution submitted by crew (${req.user?.name || 'Field Unit'}). Evidence photo uploaded. Awaiting Admin verification. Notes: ${resolutionNotes || notes || 'Work completed'}`,
       req.user?.name
     );
+
+    // Sync updated incident to Supabase
+    syncIncident({
+      ...incident,
+      status: nextStatus,
+      resolution_evidence_url: finalEvidenceUrl,
+      resolution_notes: resolutionNotes || notes || 'Field repair completed.',
+      resolution_submitted_at: now,
+      resolved_at: now,
+      updated_at: now
+    });
 
     res.json({ 
       success: true, 

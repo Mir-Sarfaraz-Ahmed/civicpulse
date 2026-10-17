@@ -16,8 +16,16 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           <nav className="nav-links">
             {user ? (
               <>
-                <span className="hide-mobile" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                  Logged in as <strong style={{ color: '#fff' }}>{user.name}</strong> ({user.role})
+                <span className="hide-mobile" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {user.avatar && (
+                    <img 
+                      src={user.avatar} 
+                      alt={user.name || 'User'} 
+                      referrerPolicy="no-referrer"
+                      style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--primary-neon)' }}
+                    />
+                  )}
+                  <span>Logged in as <strong style={{ color: '#fff' }}>{user.name}</strong> ({user.role})</span>
                 </span>
                 
                 {user.role === 'civilian' ? (

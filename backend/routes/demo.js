@@ -4,6 +4,7 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
+const { syncIncident, syncReport, syncStatusHistory, clearSupabaseTables } = require('../supabaseSync');
 
 const router = express.Router();
 
@@ -183,6 +184,61 @@ router.post('/seed', (req, res) => {
             twoDaysAgo
           ]
         );
+
+        // Sync report to Supabase
+        syncReport({
+          id: reportId,
+          citizen_id: rep.citizen || citizenId,
+          incident_id: incidentId,
+          image_url: rep.imageUrl,
+          description: rep.desc,
+          latitude: rep.lat,
+          longitude: rep.lng,
+          address,
+          ai_problem: rep.problem,
+          ai_category: category,
+          ai_severity: rep.severity,
+          ai_summary: rep.summary,
+          created_at: twoDaysAgo
+        });
+      });
+
+      // Sync incident to Supabase
+      syncIncident({
+        id: incidentId,
+        category,
+        severity,
+        priority_score: priorityScore,
+        status,
+        latitude: lat,
+        longitude: lng,
+        address,
+        assigned_worker: assignedWorker,
+        assigned_crew_id: assignedCrewId,
+        assigned_at: assignedWorker ? oneDayAgo : null,
+        dispatch_notes: dispatchNotes,
+        resolution_evidence_url: resolvedEvidence,
+        resolution_notes: resolutionNotes,
+        resolution_submitted_at: status === 'Resolution Submitted' || status === 'Resolution Rejected' || status === 'Closed' || status === 'Resolved' ? threeHoursAgo : null,
+        rejection_reason: rejectionReason,
+        rejected_at: rejectionReason ? oneHourAgo : null,
+        rejected_by: rejectionReason ? adminId : null,
+        approved_by: approvedBy,
+        approved_at: status === 'Closed' ? oneHourAgo : null,
+        resolved_at: status === 'Resolved' || status === 'Closed' ? threeHoursAgo : null,
+        closed_at: status === 'Closed' ? oneHourAgo : null,
+        created_at: twoDaysAgo,
+        updated_at: new Date().toISOString()
+      });
+
+      // Sync history log to Supabase
+      syncStatusHistory({
+        id: hist1,
+        incident_id: incidentId,
+        status: 'Reported',
+        changed_by: citizenId,
+        notes: 'Citizen submitted report. AI vision categorized incident.',
+        created_at: twoDaysAgo
       });
     }
 
@@ -392,6 +448,10 @@ router.post('/clear', (req, res) => {
     query.exec('DELETE FROM incidents;');
     query.exec('DELETE FROM users;');
     query.exec('PRAGMA foreign_keys = ON;');
+    
+    // Also wipe Supabase tables
+    clearSupabaseTables();
+
     console.log('[Demo Clear] Database cleared successfully.');
     res.json({
       success: true,

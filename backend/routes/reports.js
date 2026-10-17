@@ -9,8 +9,9 @@ const { processReportGrouping } = require('../utils/incidentEngine');
 
 const router = express.Router();
 
-// Configure storage and ensure folder exists
-const uploadsDir = path.join(__dirname, '..', 'uploads');
+// Configure storage and ensure folder exists (uses /tmp on Vercel)
+const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const uploadsDir = isVercel ? path.join('/tmp', 'uploads') : path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -91,6 +92,9 @@ function cleanGeminiJsonResponse(text) {
   return cleaned;
 }
 
+const { uploadToStorage, supabase } = require('../supabase');
+const { deleteReportFromSupabase, deleteIncidentFromSupabase } = require('../supabaseSync');
+
 // 1. Upload & Analyze Image with AI (Protected)
 // Endpoint: POST /api/reports/analyze
 router.post('/analyze', requireAuth, upload.single('image'), async (req, res) => {
@@ -100,7 +104,19 @@ router.post('/analyze', requireAuth, upload.single('image'), async (req, res) =>
 
   const { description, latitude, longitude } = req.body;
   const imagePath = req.file.path;
-  const imageUrl = `/uploads/${req.file.filename}`;
+  let imageUrl = `/uploads/${req.file.filename}`;
+
+  // Upload to Supabase Storage
+  try {
+    const fileBuffer = fs.readFileSync(imagePath);
+    const storageUrl = await uploadToStorage(fileBuffer, req.file.originalname, req.file.mimetype, 'reports');
+    if (storageUrl) {
+      imageUrl = storageUrl;
+      console.log(`[Supabase Storage] Report image saved to bucket: ${imageUrl}`);
+    }
+  } catch (storageErr) {
+    console.warn('[Supabase Storage Warning] Falling back to local image URL:', storageErr.message);
+  }
 
   const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_BACKUP_KEY].filter(Boolean);
 
@@ -292,6 +308,28 @@ router.post('/submit', requireAuth, (req, res) => {
 
     const incidentId = processReportGrouping(reportId, reportData);
 
+    // Sync report to Supabase reports table
+    try {
+      supabase.from('reports').insert([{
+        id: reportId,
+        citizen_id: citizenId,
+        incident_id: incidentId,
+        image_url: imageUrl,
+        description: description || '',
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        address: address || 'Delhi, India',
+        ai_problem,
+        ai_category,
+        ai_severity,
+        ai_summary: ai_summary || ''
+      }]).then(({ error }) => {
+        if (error) console.warn('[Supabase Reports Sync Warning]', error.message);
+      });
+    } catch (supaErr) {
+      console.warn('[Supabase Reports Sync Error]', supaErr.message);
+    }
+
     console.log(`[Reports] New report submitted: ID=${reportId}, Linked to Incident=${incidentId}`);
 
     res.status(201).json({
@@ -391,8 +429,9 @@ router.delete('/:id', requireAuth, (req, res) => {
 
     const incidentId = report.incident_id;
 
-    // Delete report from DB
+    // Delete report from DB and Supabase
     query.run('DELETE FROM reports WHERE id = ?', [reportId]);
+    deleteReportFromSupabase(reportId);
     console.log(`[Reports] Report ${reportId} deleted by user ${req.user.email}`);
 
     // If report was linked to an incident, check if that incident has any reports left
@@ -404,6 +443,7 @@ router.delete('/:id', requireAuth, (req, res) => {
         // No reports left, delete the incident entirely
         query.run('DELETE FROM incidents WHERE id = ?', [incidentId]);
         query.run('DELETE FROM incident_status_history WHERE incident_id = ?', [incidentId]);
+        deleteIncidentFromSupabase(incidentId);
         console.log(`[Reports] Deleted orphaned incident ${incidentId} since all reports were withdrawn.`);
       } else {
         // Re-evaluate incident priority based on remaining reports

@@ -22,8 +22,7 @@ import {
 } from 'lucide-react';
 import MapComponent from './MapComponent';
 import { API_BASE, getImageUrl } from '../config';
-import { db } from '../firebaseClient';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../supabaseClient';
 
 const PREDEFINED_WORKERS = [
   "Rapid Response Dispatch Crew (North)",
@@ -166,24 +165,24 @@ export default function AdminDashboard({ token, user, onLogout, onBackToHome }) 
   useEffect(() => {
     fetchDashboardData(true);
 
-    // Attach Firestore real-time listener
-    let unsubscribe = null;
+    // Attach Supabase Realtime listener for live incident updates
+    let channel = null;
     try {
-      const incidentsCol = collection(db, 'incidents');
-      unsubscribe = onSnapshot(incidentsCol, () => {
-        fetchDashboardData(false);
-        if (selectedIncidentIdRef.current) {
-          fetchIncidentDetails(selectedIncidentIdRef.current, false);
-        }
-      }, (err) => {
-        console.warn('[Firestore Admin Listener Warning]', err.message);
-      });
+      channel = supabase
+        .channel('admin-incidents-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => {
+          fetchDashboardData(false);
+          if (selectedIncidentIdRef.current) {
+            fetchIncidentDetails(selectedIncidentIdRef.current, false);
+          }
+        })
+        .subscribe();
     } catch (e) {
-      console.warn('[Firestore Setup Warning]', e);
+      console.warn('[Supabase Realtime Setup Warning]', e);
     }
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (channel) supabase.removeChannel(channel);
     };
   }, [token, fetchDashboardData, fetchIncidentDetails]);
 

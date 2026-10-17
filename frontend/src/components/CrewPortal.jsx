@@ -24,8 +24,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { API_BASE, getImageUrl } from '../config';
-import { db } from '../firebaseClient';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../supabaseClient';
 
 export default function CrewPortal({ token, user, onLogout, onBackToHome }) {
   const [tasks, setTasks] = useState([]);
@@ -88,22 +87,21 @@ export default function CrewPortal({ token, user, onLogout, onBackToHome }) {
   useEffect(() => {
     fetchTasks(true);
 
-    // Attach Firestore real-time listener for instant sync
-    let unsubscribe = null;
+    // Attach Supabase Realtime listener for live crew task updates
+    let channel = null;
     try {
-      const incidentsCol = collection(db, 'incidents');
-      unsubscribe = onSnapshot(incidentsCol, () => {
-        // When any document changes, silently refresh the populated task list from backend
-        fetchTasks(false);
-      }, (err) => {
-        console.warn('[Firestore Crew Listener Warning]', err.message);
-      });
+      channel = supabase
+        .channel('crew-incidents-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => {
+          fetchTasks(false);
+        })
+        .subscribe();
     } catch (e) {
-      console.warn('[Firestore Listener Setup Warning]', e);
+      console.warn('[Supabase Realtime Crew Setup Warning]', e);
     }
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (channel) supabase.removeChannel(channel);
     };
   }, [token, fetchTasks]);
 

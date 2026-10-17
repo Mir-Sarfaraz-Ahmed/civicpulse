@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
+const { syncIncident, syncStatusHistory } = require('../supabaseSync');
 
 // Haversine formula to compute distance in meters between two coordinate sets
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -96,11 +97,12 @@ function processReportGrouping(reportId, reportData) {
 
     // Recalculate priority score
     const newPriorityScore = calculatePriorityScore(category, finalSeverity, description, reportCount);
+    const updatedAt = new Date().toISOString();
 
     // Update incident properties
     query.run(
       'UPDATE incidents SET severity = ?, priority_score = ?, updated_at = ? WHERE id = ?',
-      [finalSeverity, newPriorityScore, new Date().toISOString(), matchedIncident.id]
+      [finalSeverity, newPriorityScore, updatedAt, matchedIncident.id]
     );
 
     // Link report
@@ -108,21 +110,52 @@ function processReportGrouping(reportId, reportData) {
 
     // Record in history
     const historyId = uuidv4();
+    const historyNotes = `Report linked. Severity re-evaluated, priority score updated to ${newPriorityScore}.`;
     query.run(
       'INSERT INTO incident_status_history (id, incident_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [historyId, matchedIncident.id, matchedIncident.status, citizenId, `Report linked. Severity re-evaluated, priority score updated to ${newPriorityScore}.`, new Date().toISOString()]
+      [historyId, matchedIncident.id, matchedIncident.status, citizenId, historyNotes, updatedAt]
     );
+
+    // Sync to Supabase PostgreSQL
+    syncIncident({
+      ...matchedIncident,
+      severity: finalSeverity,
+      priority_score: newPriorityScore,
+      updated_at: updatedAt
+    });
+    syncStatusHistory({
+      id: historyId,
+      incident_id: matchedIncident.id,
+      status: matchedIncident.status,
+      changed_by: citizenId,
+      notes: historyNotes,
+      created_at: updatedAt
+    });
 
     return matchedIncident.id;
   } else {
     // 2. Create a new incident
     const incidentId = uuidv4();
     const priorityScore = calculatePriorityScore(category, severity, description, 1);
+    const now = new Date().toISOString();
+
+    const newIncident = {
+      id: incidentId,
+      category,
+      severity,
+      priority_score: priorityScore,
+      status: 'Reported',
+      latitude,
+      longitude,
+      address: address || 'Delhi, India',
+      created_at: now,
+      updated_at: now
+    };
 
     query.run(
       `INSERT INTO incidents (id, category, severity, priority_score, status, latitude, longitude, address, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [incidentId, category, severity, priorityScore, 'Reported', latitude, longitude, address || 'Delhi, India', new Date().toISOString(), new Date().toISOString()]
+      [incidentId, category, severity, priorityScore, 'Reported', latitude, longitude, address || 'Delhi, India', now, now]
     );
 
     // Link report
@@ -130,10 +163,22 @@ function processReportGrouping(reportId, reportData) {
 
     // Record initial status history
     const historyId = uuidv4();
+    const historyNotes = 'Initial report registered. Incident created.';
     query.run(
       'INSERT INTO incident_status_history (id, incident_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [historyId, incidentId, 'Reported', citizenId, 'Initial report registered. Incident created.', new Date().toISOString()]
+      [historyId, incidentId, 'Reported', citizenId, historyNotes, now]
     );
+
+    // Sync to Supabase PostgreSQL
+    syncIncident(newIncident);
+    syncStatusHistory({
+      id: historyId,
+      incident_id: incidentId,
+      status: 'Reported',
+      changed_by: citizenId,
+      notes: historyNotes,
+      created_at: now
+    });
 
     console.log(`[Duplicate Detector] Created new incident ${incidentId} for report ${reportId}`);
     return incidentId;

@@ -286,20 +286,35 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
               alignItems: 'center',
               gap: '10px'
             }}>
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--primary-neon), var(--secondary-neon))',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                color: '#000',
-                fontSize: '0.85rem'
-              }}>
-                {user.name ? user.name[0].toUpperCase() : (user.email ? user.email[0].toUpperCase() : 'C')}
-              </div>
+              {user.avatar ? (
+                <img 
+                  src={user.avatar} 
+                  alt={user.name || 'Citizen'} 
+                  referrerPolicy="no-referrer"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '1.5px solid var(--primary-neon)'
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--primary-neon), var(--secondary-neon))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  color: '#000',
+                  fontSize: '0.85rem'
+                }}>
+                  {user.name ? user.name[0].toUpperCase() : (user.email ? user.email[0].toUpperCase() : 'C')}
+                </div>
+              )}
               <div>
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {user.name || user.email}

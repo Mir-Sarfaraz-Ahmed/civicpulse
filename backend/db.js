@@ -2,8 +2,10 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure the database file is placed in the backend folder
-const dbPath = path.join(__dirname, 'database.sqlite');
+// Ensure the database file is placed in a writable folder (uses /tmp on Vercel)
+const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const dbDir = isVercel ? '/tmp' : __dirname;
+const dbPath = path.join(dbDir, 'database.sqlite');
 const db = new DatabaseSync(dbPath);
 
 console.log(`[Database] Connected to SQLite database at ${dbPath}`);
@@ -165,6 +167,14 @@ function initDb() {
         );
         console.log(`[Database Init] Synchronized preset account: ${u.email}`);
       }
+
+      // Sync preset profiles to Supabase if available
+      try {
+        const { supabase } = require('./supabase');
+        supabase.from('profiles').upsert([
+          { email: u.email, role: u.role, name: u.name }
+        ], { onConflict: 'email' }).then(() => {}).catch(() => {});
+      } catch (e) {}
     }
   } catch (err) {
     console.warn('[Database Init] Warning ensuring default users:', err.message);

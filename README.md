@@ -4,14 +4,37 @@ CivicPulse AI is an AI-powered urban response system designed for the **BrainWav
 
 ---
 
+## Supabase Integration
+
+CivicPulse AI is integrated with **Supabase** for:
+1. **Authentication**: User registration, login, and role-based permissions (`civilian`, `admin`, `crew`) via Supabase Auth and `public.profiles`.
+2. **Storage**: Citizen issue photos and crew resolution evidence photos are securely uploaded and hosted in the `civicpulse-uploads` Supabase Storage bucket.
+3. **Database**: PostgreSQL tables for `incidents`, `reports`, `incident_status_history`, and `profiles`, with automated synchronization and Row-Level Security (RLS) policies.
+
+### One-Time Supabase Setup (SQL Editor)
+1. Open your Supabase Dashboard: [Supabase SQL Editor](https://supabase.com/dashboard/project/wpqybcukijxmfpzzdykt/sql)
+2. Open [`supabase-schema.sql`](./supabase-schema.sql) in this repository.
+3. Copy all contents, paste them into the SQL Editor, and click **Run**.
+4. This will create:
+   - `public.profiles` with automatic trigger on new auth signups
+   - `public.incidents` table with coordinates, priority score, and lifecycle tracking
+   - `public.reports` table for citizen submissions
+   - `public.incident_status_history` audit trail table
+   - `civicpulse-uploads` public storage bucket and access policies
+
+---
+
 ## Workspace Structure
 
+- `supabase-schema.sql`: Complete PostgreSQL database schema, triggers, and storage bucket configuration.
 - `backend/`: Node.js Express server.
-  - `database.sqlite`: SQLite database file populated dynamically.
-  - `db.js`: Schema definitions and queries using built-in `node:sqlite`.
+  - `supabase.js`: Supabase server-side client, token validator, and storage uploader.
+  - `supabaseSync.js`: Real-time synchronization layer mirroring all database mutations to Supabase PostgreSQL.
+  - `db.js`: Local SQLite caching layer and migration queries.
   - `routes/`: Auth, reports, incidents, and demo seeder REST endpoints.
-  - `uploads/`: Static image folder for uploaded citizen evidence and resolution proofs.
+  - `uploads/`: Static image folder for local fallback.
 - `frontend/`: React Vite client.
+  - `src/supabaseClient.js`: Supabase client and storage upload utilities.
   - `src/components/`: Map components, landing pages, civilian portals, and admin consoles.
   - `src/index.css`: Custom vanilla dark-theme CSS design system.
 
@@ -20,41 +43,43 @@ CivicPulse AI is an AI-powered urban response system designed for the **BrainWav
 ## Local Installation & Startup
 
 ### Prerequisites
-- Node.js v22.5.0 or higher (which contains the native `node:sqlite` module).
+- Node.js v22.5.0 or higher.
 
-### 1. Run Backend Server
-Navigate to the backend folder:
+### 1. Unified Dev Server (Recommended)
+You can run both backend and frontend together:
+```bash
+npm install
+npm run dev
+```
+Open `http://localhost:3000` in your browser.
+
+### 2. Separate Terminal Startup (Optional)
+**Backend**:
 ```bash
 cd backend
 npm install
-```
-
-Start the server:
-```bash
 npm run dev
 ```
-The server will run on `http://localhost:5000`.
+Runs on `http://localhost:5000`.
 
-To register your first admin user, run:
-```bash
-node scripts/create-admin.js --email=admin@civilpulse.gov.in --password=AdminSecurePassword123 --name="Civic Admin"
-```
-
-### 2. Run Frontend Client
-Open a second terminal and navigate to the frontend folder:
+**Frontend**:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-The client will run on `http://localhost:5173`. Open this URL in your web browser.
+Runs on `http://localhost:5173`.
 
 ---
 
 ## Quick Demo Seeding (Judging Instructions)
 
 For instant judging evaluation:
-1. Open the login screen (`http://localhost:5173/login`).
+1. Open the login screen (`/login`).
 2. Scroll to the bottom and click **Seed Delhi Demo Incidents**.
-3. The database will automatically reset and seed 10 distinct, realistic civic incidents centered in Delhi.
-4. Use the provided demo login credentials shown on-screen to access civilian portals or administrative command dashboards instantly.
+3. The database will automatically reset and seed 10 distinct, realistic civic incidents centered in Delhi into both local and Supabase databases.
+4. Use the provided demo login credentials shown on-screen to access civilian portals or administrative command dashboards instantly:
+   - **Admin**: `admin@gmail.com` / `31102006`
+   - **Crew**: `crew@gmail.com` / `311102006`
+   - **Citizen**: `citizen@gmail.com` / `31102006`
+
