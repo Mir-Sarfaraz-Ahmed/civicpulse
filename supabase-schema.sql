@@ -241,5 +241,119 @@ CREATE POLICY "Allow Deletes in civicpulse storage"
   USING (bucket_id IN ('civicpusleai', 'civicpulse-uploads'));
 
 -- ====================================================================
+-- 7. Fixed Demo Accounts (Admin, Crew, and Citizen) in Supabase Auth
+-- ====================================================================
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+DO $$
+DECLARE
+  v_admin_id UUID;
+  v_crew_id UUID;
+  v_citizen_id UUID;
+BEGIN
+  -- 1. Admin Account: admin@gmail.com / 31102006
+  SELECT id INTO v_admin_id FROM auth.users WHERE email = 'admin@gmail.com';
+  IF v_admin_id IS NULL THEN
+    v_admin_id := gen_random_uuid();
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      v_admin_id,
+      'authenticated',
+      'authenticated',
+      'admin@gmail.com',
+      crypt('31102006', gen_salt('bf')),
+      NOW(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{"name":"City Municipal Admin","role":"admin"}'::jsonb,
+      NOW(),
+      NOW()
+    );
+  ELSE
+    UPDATE auth.users
+    SET encrypted_password = crypt('31102006', gen_salt('bf')),
+        email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
+        raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || '{"name":"City Municipal Admin","role":"admin"}'::jsonb,
+        updated_at = NOW()
+    WHERE id = v_admin_id;
+  END IF;
+
+  INSERT INTO public.profiles (id, email, name, role)
+  VALUES (v_admin_id, 'admin@gmail.com', 'City Municipal Admin', 'admin')
+  ON CONFLICT (id) DO UPDATE
+  SET role = 'admin', name = 'City Municipal Admin', email = 'admin@gmail.com';
+
+  -- 2. Crew Account: crew@gmail.com / 311102006
+  SELECT id INTO v_crew_id FROM auth.users WHERE email = 'crew@gmail.com';
+  IF v_crew_id IS NULL THEN
+    v_crew_id := gen_random_uuid();
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      v_crew_id,
+      'authenticated',
+      'authenticated',
+      'crew@gmail.com',
+      crypt('311102006', gen_salt('bf')),
+      NOW(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{"name":"Rapid Response Dispatch Crew","role":"crew"}'::jsonb,
+      NOW(),
+      NOW()
+    );
+  ELSE
+    UPDATE auth.users
+    SET encrypted_password = crypt('311102006', gen_salt('bf')),
+        email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
+        raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || '{"name":"Rapid Response Dispatch Crew","role":"crew"}'::jsonb,
+        updated_at = NOW()
+    WHERE id = v_crew_id;
+  END IF;
+
+  INSERT INTO public.profiles (id, email, name, role)
+  VALUES (v_crew_id, 'crew@gmail.com', 'Rapid Response Dispatch Crew', 'crew')
+  ON CONFLICT (id) DO UPDATE
+  SET role = 'crew', name = 'Rapid Response Dispatch Crew', email = 'crew@gmail.com';
+
+  -- 3. Citizen Account: citizen@gmail.com / 31102006
+  SELECT id INTO v_citizen_id FROM auth.users WHERE email = 'citizen@gmail.com';
+  IF v_citizen_id IS NULL THEN
+    v_citizen_id := gen_random_uuid();
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      v_citizen_id,
+      'authenticated',
+      'authenticated',
+      'citizen@gmail.com',
+      crypt('31102006', gen_salt('bf')),
+      NOW(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{"name":"Citizen Reporter","role":"civilian"}'::jsonb,
+      NOW(),
+      NOW()
+    );
+  ELSE
+    UPDATE auth.users
+    SET encrypted_password = crypt('31102006', gen_salt('bf')),
+        email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
+        raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || '{"name":"Citizen Reporter","role":"civilian"}'::jsonb,
+        updated_at = NOW()
+    WHERE id = v_citizen_id;
+  END IF;
+
+  INSERT INTO public.profiles (id, email, name, role)
+  VALUES (v_citizen_id, 'citizen@gmail.com', 'Citizen Reporter', 'civilian')
+  ON CONFLICT (id) DO UPDATE
+  SET role = 'civilian', name = 'Citizen Reporter', email = 'citizen@gmail.com';
+END $$;
+
+-- ====================================================================
 -- Schema Setup Complete!
 -- ====================================================================
