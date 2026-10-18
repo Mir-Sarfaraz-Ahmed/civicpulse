@@ -46,12 +46,14 @@ const authRouter = require('./backend/routes/auth');
 const reportsRouter = require('./backend/routes/reports');
 const incidentsRouter = require('./backend/routes/incidents');
 const demoRouter = require('./backend/routes/demo');
+const tinyfishRouter = require('./backend/routes/tinyfish');
 
 // Mount Routers
 app.use('/api/auth', authRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/incidents', incidentsRouter);
 app.use('/api/demo', demoRouter);
+app.use('/api/tinyfish', tinyfishRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

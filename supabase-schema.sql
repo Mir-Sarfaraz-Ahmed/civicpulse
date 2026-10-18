@@ -73,9 +73,21 @@ CREATE TABLE IF NOT EXISTS public.incidents (
   approved_at TIMESTAMPTZ,
   resolved_at TIMESTAMPTZ,
   closed_at TIMESTAMPTZ,
+  external_lodging_status TEXT,
+  external_portal_name TEXT,
+  external_reference_id TEXT,
+  external_lodged_at TIMESTAMPTZ,
+  external_lodging_details TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure external lodging columns exist if table was already created
+ALTER TABLE public.incidents ADD COLUMN IF NOT EXISTS external_lodging_status TEXT;
+ALTER TABLE public.incidents ADD COLUMN IF NOT EXISTS external_portal_name TEXT;
+ALTER TABLE public.incidents ADD COLUMN IF NOT EXISTS external_reference_id TEXT;
+ALTER TABLE public.incidents ADD COLUMN IF NOT EXISTS external_lodged_at TIMESTAMPTZ;
+ALTER TABLE public.incidents ADD COLUMN IF NOT EXISTS external_lodging_details TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_incidents_status ON public.incidents(status);
 CREATE INDEX IF NOT EXISTS idx_incidents_coords ON public.incidents(latitude, longitude);

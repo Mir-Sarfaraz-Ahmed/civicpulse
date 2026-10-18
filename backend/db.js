@@ -101,7 +101,12 @@ function initDb() {
     'rejected_at TIMESTAMP',
     'rejected_by TEXT',
     'approved_by TEXT',
-    'approved_at TIMESTAMP'
+    'approved_at TIMESTAMP',
+    'external_lodging_status TEXT',
+    'external_portal_name TEXT',
+    'external_reference_id TEXT',
+    'external_lodged_at TIMESTAMP',
+    'external_lodging_details TEXT'
   ];
   for (const colDef of newCols) {
     try {

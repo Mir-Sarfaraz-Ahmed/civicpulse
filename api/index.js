@@ -32,11 +32,13 @@ const authRouter = require('../backend/routes/auth');
 const reportsRouter = require('../backend/routes/reports');
 const incidentsRouter = require('../backend/routes/incidents');
 const demoRouter = require('../backend/routes/demo');
+const tinyfishRouter = require('../backend/routes/tinyfish');
 
 app.use('/api/auth', authRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/incidents', incidentsRouter);
 app.use('/api/demo', demoRouter);
+app.use('/api/tinyfish', tinyfishRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', serverless: true, time: new Date() });

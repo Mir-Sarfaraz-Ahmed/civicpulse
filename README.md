@@ -24,6 +24,25 @@ CivicPulse AI is integrated with **Supabase** for:
 
 ---
 
+## TinyFish (tinyfish.ai) Autonomous Agent Integration
+
+CivicPulse AI integrates **TinyFish Autonomous Browser Agents** (`@tiny-fish/sdk`) to automate external municipal grievance lodging across government portals:
+1. **Multi-Portal Dispatch**: Automatically routes high-severity incidents to official external portals based on category:
+   - **MCD 311**: Road potholes, sanitation, illegal dumping, garbage
+   - **Delhi Jal Board (DJB)**: Pipeline bursts, water leakages, sewage overflow
+   - **PWD Delhi**: Bridges, flyovers, arterial highways
+   - **NDMC Smart City**: Broken streetlights, unlit dark zones, hazardous open wiring
+   - **Delhi Traffic Police**: Signal light failures, major intersections
+2. **Autonomous Grievance Form Filling**: Navigates external portal workflows, fills out coordinates, priority score, and citizen descriptions, and secures confirmation ticket reference numbers.
+3. **Audit Trail**: Every TinyFish agent run is logged in `incident_status_history` and synced in real-time to Supabase PostgreSQL.
+4. **Configuration**: Add your API key to `.env`:
+   ```bash
+   TINYFISH_API_KEY=your_tinyfish_api_key_here
+   ```
+   *(Note: If no API key is present or when dry-run is toggled, a high-fidelity safe simulation mode executes so judging and testing work out of the box).*
+
+---
+
 ## Workspace Structure
 
 - `supabase-schema.sql`: Complete PostgreSQL database schema, triggers, and storage bucket configuration.

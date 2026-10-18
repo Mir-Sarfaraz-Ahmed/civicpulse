@@ -31,6 +31,11 @@ async function syncIncident(incident) {
       approved_at: incident.approved_at || null,
       resolved_at: incident.resolved_at || null,
       closed_at: incident.closed_at || null,
+      external_lodging_status: incident.external_lodging_status || null,
+      external_portal_name: incident.external_portal_name || null,
+      external_reference_id: incident.external_reference_id || null,
+      external_lodged_at: incident.external_lodged_at || null,
+      external_lodging_details: incident.external_lodging_details || null,
       created_at: incident.created_at || new Date().toISOString(),
       updated_at: incident.updated_at || new Date().toISOString()
     };
