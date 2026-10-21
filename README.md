@@ -6,7 +6,7 @@ Naagrik is an AI-powered urban response system. It allows citizens to report loc
 
 ## Supabase Integration
 
-CivicPulse AI is integrated with **Supabase** for:
+Naagrik is integrated with **Supabase** for:
 1. **Authentication**: User registration, login, and role-based permissions (`civilian`, `admin`, `crew`) via Supabase Auth and `public.profiles`.
 2. **Storage**: Citizen issue photos and crew resolution evidence photos are securely uploaded and hosted in the `civicpulse-uploads` Supabase Storage bucket.
 3. **Database**: PostgreSQL tables for `incidents`, `reports`, `incident_status_history`, and `profiles`, with automated synchronization and Row-Level Security (RLS) policies.
