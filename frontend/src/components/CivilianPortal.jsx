@@ -217,59 +217,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     }
   };
 
-  // Fast image optimization helper (downsamples 5-12MB phone photos to ~150KB for sub-second AI inference)
-  const optimizeImageForUpload = async (file) => {
-    if (!file || !file.type.startsWith('image/') || file.size < 350 * 1024) {
-      return file;
-    }
-    return new Promise((resolve) => {
-      try {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = document.createElement('img');
-          img.onload = () => {
-            const MAX_DIM = 1200;
-            let width = img.width;
-            let height = img.height;
-            if (width > MAX_DIM || height > MAX_DIM) {
-              if (width > height) {
-                height = Math.round((height * MAX_DIM) / width);
-                width = MAX_DIM;
-              } else {
-                width = Math.round((width * MAX_DIM) / height);
-                height = MAX_DIM;
-              }
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            canvas.toBlob(
-              (blob) => {
-                if (blob && blob.size < file.size) {
-                  const optimizedFile = new File([blob], file.name || 'incident.jpg', { type: 'image/jpeg' });
-                  resolve(optimizedFile);
-                } else {
-                  resolve(file);
-                }
-              },
-              'image/jpeg',
-              0.82
-            );
-          };
-          img.onerror = () => resolve(file);
-          img.src = e.target.result;
-        };
-        reader.onerror = () => resolve(file);
-        reader.readAsDataURL(file);
-      } catch (err) {
-        resolve(file);
-      }
-    });
-  };
-
-  // High-performance AI analysis and upload
+  // Upload directly to Supabase Storage in user's folder and analyze with AI
   const handleRunAnalysisAndUpload = async () => {
     if (!selectedImage && !description.trim()) {
       setErrorMsg('Please upload a photo or write / dictate an issue description first.');
@@ -278,67 +226,46 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
     setAnalyzing(true);
     setErrorMsg(null);
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000); // 10s maximum client timeout
+    let supabaseImageUrl = null;
+    if (selectedImage) {
+      try {
+        supabaseImageUrl = await uploadToSupabaseStorage(selectedImage, 'reports', user?.id || 'citizen');
+        window.lastUploadedUrl = supabaseImageUrl;
+      } catch (uploadErr) {
+        console.warn('[Direct Supabase Storage Note]:', uploadErr.message);
+      }
+    }
+
+    const formData = new FormData();
+    if (selectedImage) {
+      formData.append('image', selectedImage);
+    }
+    if (supabaseImageUrl) {
+      formData.append('imageUrl', supabaseImageUrl);
+    }
+    formData.append('description', description);
+    formData.append('latitude', location.lat);
+    formData.append('longitude', location.lng);
 
     try {
-      // 1. Optimize image payload for instant network transfer (<150KB)
-      const imageToUpload = selectedImage ? await optimizeImageForUpload(selectedImage) : null;
-
-      const formData = new FormData();
-      if (imageToUpload) {
-        formData.append('image', imageToUpload);
-      }
-      formData.append('description', description);
-      formData.append('latitude', location.lat);
-      formData.append('longitude', location.lng);
-
       const response = await fetch(`${API_BASE}/reports/analyze`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
-        body: formData,
-        signal: controller.signal
+        body: formData
       });
-
-      clearTimeout(timer);
       const data = await response.json();
-      if (response.ok && data.analysis) {
-        window.lastUploadedUrl = data.imageUrl || '';
+      if (response.ok) {
+        window.lastUploadedUrl = data.imageUrl || supabaseImageUrl || '';
         setAiAnalysis(data.analysis);
         setReportStep(3); // Move to review step
       } else {
         setErrorMsg(data.error || 'AI analysis failed.');
       }
     } catch (err) {
-      clearTimeout(timer);
-      console.warn('[AI Analysis Fast Failover engaged]:', err.message);
-      
-      // Safety net fallback so the citizen is NEVER blocked
-      const textLower = (description || '').toLowerCase();
-      const fallbackProblem = textLower.includes('pothole') || textLower.includes('road') ? 'Pothole / Road Damage'
-        : textLower.includes('garbage') || textLower.includes('trash') || textLower.includes('dirty') ? 'Garbage / Dumping'
-        : textLower.includes('water') || textLower.includes('leak') ? 'Water Leakage'
-        : textLower.includes('light') || textLower.includes('wire') ? 'Broken Streetlight / Electric Hazard'
-        : 'Civic Infrastructure Concern';
-
-      const fallbackCategory = textLower.includes('garbage') || textLower.includes('trash') ? 'Garbage / Dumping'
-        : textLower.includes('water') ? 'Water Leakage'
-        : textLower.includes('light') || textLower.includes('wire') ? 'Damaged Infrastructure'
-        : 'Road Infrastructure';
-
-      setAiAnalysis({
-        problem: fallbackProblem,
-        category: fallbackCategory,
-        severity: 'High',
-        summary: description || 'Reported civic issue awaiting municipal resolution.',
-        detected_language: 'English',
-        translated_english: null,
-        isFallback: true,
-        provider: 'safety-net'
-      });
-      setReportStep(3);
+      console.error(err);
+      setErrorMsg('Network error during AI analysis.');
     } finally {
       setAnalyzing(false);
     }
@@ -1624,29 +1551,7 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                 <div style={{ color: 'var(--text-muted)', marginTop: '6px' }}>Address: {location.address}</div>
               </div>
 
-              {analyzing && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 18px',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.1) 0%, rgba(79, 172, 254, 0.05) 100%)',
-                  border: '1px solid rgba(0, 242, 254, 0.35)',
-                  color: '#00f2fe',
-                  fontSize: '0.85rem',
-                  marginBottom: '16px',
-                  boxShadow: '0 4px 18px rgba(0, 242, 254, 0.15)'
-                }}>
-                  <Loader size={18} style={{ animation: 'spin 1.2s infinite linear', flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600 }}>Optimizing image & analyzing with Gemini AI...</div>
-                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Classifying severity, category & municipal priority</div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex-row-between" style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: '20px' }}>
+              <div className="flex-row-between" style={{ borderTop: '1px solid var(--border-light)', paddingTop: '20px', marginTop: '30px' }}>
                 <button onClick={() => setReportStep(1)} className="btn btn-secondary">
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -1654,9 +1559,6 @@ export default function CivilianPortal({ token, user, onLogout, onBackToHome }) 
                   onClick={handleRunAnalysisAndUpload} 
                   disabled={analyzing}
                   className="btn btn-primary"
-                  style={{
-                    boxShadow: analyzing ? '0 0 20px rgba(0, 242, 254, 0.4)' : 'none'
-                  }}
                 >
                   {analyzing ? (
                     <>
