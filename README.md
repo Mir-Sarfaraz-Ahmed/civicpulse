@@ -1,6 +1,6 @@
-# CivicPulse AI — AI-Powered Urban Intelligence Platform
+# Naagrik — AI-Powered Urban Intelligence Platform
 
-CivicPulse AI is an AI-powered urban response system designed for the **BrainWave 2026** hackathon. It allows citizens to report local civic issues (potholes, garbage, water leaks, etc.) via image captures, descriptions, and maps. The backend analyzes the report using Google Gemini AI, groups duplicates within 100 meters, computes a deterministic priority score, and displays incidents on an authority dashboard map for worker dispatch and resolution tracking.
+Naagrik is an AI-powered urban response system. It allows citizens to report local civic issues (potholes, garbage, water leaks, etc.) via image captures, descriptions, and maps. The backend analyzes the report using Google Gemini & Groq AI, groups duplicates within 100 meters, computes a deterministic priority score, and displays incidents on an authority dashboard map for worker dispatch and resolution tracking.
 
 ---
 
@@ -21,25 +21,6 @@ CivicPulse AI is integrated with **Supabase** for:
    - `public.reports` table for citizen submissions
    - `public.incident_status_history` audit trail table
    - `civicpulse-uploads` public storage bucket and access policies
-
----
-
-## TinyFish (tinyfish.ai) Autonomous Agent Integration
-
-CivicPulse AI integrates **TinyFish Autonomous Browser Agents** (`@tiny-fish/sdk`) to automate external municipal grievance lodging across government portals:
-1. **Multi-Portal Dispatch**: Automatically routes high-severity incidents to official external portals based on category:
-   - **MCD 311**: Road potholes, sanitation, illegal dumping, garbage
-   - **Delhi Jal Board (DJB)**: Pipeline bursts, water leakages, sewage overflow
-   - **PWD Delhi**: Bridges, flyovers, arterial highways
-   - **NDMC Smart City**: Broken streetlights, unlit dark zones, hazardous open wiring
-   - **Delhi Traffic Police**: Signal light failures, major intersections
-2. **Autonomous Grievance Form Filling**: Navigates external portal workflows, fills out coordinates, priority score, and citizen descriptions, and secures confirmation ticket reference numbers.
-3. **Audit Trail**: Every TinyFish agent run is logged in `incident_status_history` and synced in real-time to Supabase PostgreSQL.
-4. **Configuration**: Add your API key to `.env`:
-   ```bash
-   TINYFISH_API_KEY=your_tinyfish_api_key_here
-   ```
-   *(Note: If no API key is present or when dry-run is toggled, a high-fidelity safe simulation mode executes so judging and testing work out of the box).*
 
 ---
 
@@ -91,9 +72,9 @@ Runs on `http://localhost:5173`.
 
 ---
 
-## Quick Demo Seeding (Judging Instructions)
+## Quick Demo Seeding (Demo Instructions)
 
-For instant judging evaluation:
+For instant demo evaluation:
 1. Open the login screen (`/login`).
 2. Scroll to the bottom and click **Seed Delhi Demo Incidents**.
 3. The database will automatically reset and seed 10 distinct, realistic civic incidents centered in Delhi into both local and Supabase databases.

@@ -71,6 +71,8 @@ export const GlassEffect = ({
     flexDirection: "column",
     borderRadius: "20px",
     overflow: "hidden",
+    backdropFilter: "blur(24px) saturate(160%)",
+    WebkitBackdropFilter: "blur(24px) saturate(160%)",
     boxShadow: glowColor 
       ? `0 18px 45px -10px rgba(0, 0, 0, 0.65), 0 0 25px ${glowColor}, inset 0 1px 1px 0 rgba(255, 255, 255, 0.25)`
       : "0 18px 45px -10px rgba(0, 0, 0, 0.55), inset 0 1px 1px 0 rgba(255, 255, 255, 0.2)",
@@ -107,7 +109,7 @@ export const GlassEffect = ({
           position: "absolute",
           inset: 0,
           background: dark 
-            ? "linear-gradient(135deg, rgba(18, 24, 48, 0.86) 0%, rgba(9, 13, 28, 0.92) 100%)" 
+            ? "linear-gradient(135deg, rgba(12, 18, 38, 0.60) 0%, rgba(6, 9, 22, 0.72) 100%)" 
             : "rgba(255, 255, 255, 0.25)",
           pointerEvents: "none",
           zIndex: 1,

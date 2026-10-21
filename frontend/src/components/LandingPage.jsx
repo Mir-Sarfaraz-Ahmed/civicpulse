@@ -1,6 +1,6 @@
 import React from 'react';
 import { Eye, Flame, ArrowRight, Zap, BarChart2 } from 'lucide-react';
-import { GlassFold } from './ui/glass-fold';
+import { TopographyBackground } from './ui/backgrounds-topography';
 import { GlassEffect, GlassFilter } from './ui/liquid-glass';
 
 export default function LandingPage({ onNavigate, user, onLogout }) {
@@ -10,30 +10,32 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
       {/* SVG Liquid Glass Refractive Filter */}
       <GlassFilter />
 
-      {/* GlassFold Animated WebGL Background Layer */}
+      {/* Topography Interactive Vector Contour Background */}
       <div 
         style={{ 
           position: 'fixed', 
           inset: 0, 
           zIndex: 0, 
-          pointerEvents: 'none',
-          overflow: 'hidden'
+          pointerEvents: 'auto',
+          overflow: 'hidden',
+          background: 'radial-gradient(ellipse at center, #071224 0%, #02040a 100%)'
         }}
       >
-        <GlassFold
-          color1="#1e3cc8"
-          color2="#06081e"
-          color3="#96d7ff"
-          speed={0.4}
-          scale={1}
-          noise={0.12}
+        <TopographyBackground
+          lineColor="rgba(0, 242, 254, 0.45)"
+          levels={18}
+          speed={0.8}
+          scale={1.2}
+          peak={1.4}
+          interactive={true}
+          style={{ width: '100%', height: '100%' }}
         />
-        {/* Soft Vignette Overlay for Crisp Contrast */}
+        {/* Subtle Vignette for High Text Readability */}
         <div 
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'radial-gradient(circle at 50% 30%, rgba(7, 9, 19, 0.45) 0%, rgba(7, 9, 19, 0.85) 100%)',
+            background: 'radial-gradient(circle at 50% 30%, rgba(2, 4, 10, 0.2) 0%, rgba(2, 4, 10, 0.75) 100%)',
             pointerEvents: 'none'
           }}
         />
@@ -47,7 +49,7 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
         <div className="container flex-row-between" style={{ minHeight: '64px', flexWrap: 'wrap', gap: '12px' }}>
           <div className="nav-logo" style={{ cursor: 'pointer' }} onClick={() => onNavigate('landing')}>
             <Zap size={22} className="neon-text" />
-            <span>Civic<span className="neon-text">Pulse</span> <span style={{ fontSize: '0.75rem', verticalAlign: 'super', background: 'rgba(0,242,254,0.1)', padding: '2px 6px', borderRadius: '4px', color: 'var(--primary-neon)', border: '1px solid rgba(0,242,254,0.2)' }}>AI</span></span>
+            <span>Naagrik</span>
           </div>
           
           <nav className="nav-links">
@@ -119,10 +121,10 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           NEXT-GEN CIVIC INTELLIGENCE PLATFORM
         </div>
         <h1 className="text-gradient" style={{ fontSize: 'clamp(2.2rem, 5.2vw, 3.6rem)', marginBottom: '18px', lineHeight: 1.16, letterSpacing: '-0.025em' }}>
-          AI-Powered Urban Intelligence <br className="hide-mobile" />& Civic Response
+          Governance decisions driven by real-time civic intelligence
         </h1>
-        <p style={{ fontSize: 'clamp(1rem, 2vw, 1.18rem)', color: 'var(--text-muted)', maxWidth: '720px', margin: '0 auto 34px', lineHeight: 1.65 }}>
-          Citizens report problems. AI analyzes and classifies the severity. CivicPulse priority engines compute response rankings, allowing authorities to act efficiently.
+        <p style={{ fontSize: 'clamp(1rem, 2vw, 1.18rem)', color: 'var(--text-muted)', maxWidth: '780px', margin: '0 auto 34px', lineHeight: 1.65 }}>
+          Naagrik aggregates citizen sentiment, public service data, and policy signals — delivering actionable intelligence to India's government bodies, civic planners, and policy researchers.
         </p>
         
         <div className="hero-cta-group">
@@ -149,15 +151,16 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           style={{ 
             padding: '22px 34px', 
             textAlign: 'center', 
-            borderColor: 'rgba(155, 81, 224, 0.35)', 
+            background: 'linear-gradient(135deg, rgba(14, 18, 36, 0.62) 0%, rgba(7, 9, 22, 0.74) 100%)',
+            borderColor: 'rgba(155, 81, 224, 0.4)', 
             maxWidth: '980px', 
             margin: '0 auto',
             borderRadius: '20px',
-            boxShadow: '0 20px 48px -10px rgba(0, 0, 0, 0.65), inset 0 1px 1px 0 rgba(255, 255, 255, 0.25), 0 0 32px rgba(155, 81, 224, 0.12)' 
+            boxShadow: '0 20px 48px -10px rgba(0, 0, 0, 0.75), inset 0 1px 1px 0 rgba(255, 255, 255, 0.25), 0 0 32px rgba(155, 81, 224, 0.15)' 
           }}
         >
           <h3 style={{ fontSize: 'clamp(1rem, 2vw, 1.22rem)', fontWeight: 500, color: 'var(--text-main)', lineHeight: 1.55 }}>
-            ⚡ <span className="neon-text" style={{ fontWeight: 700 }}>CivicPulse AI</span> converts raw complaints into structured, prioritized, actionable urban intelligence.
+            ⚡ <span className="neon-text" style={{ fontWeight: 700 }}>Naagrik</span> converts raw complaints into structured, prioritized, actionable urban intelligence.
           </h3>
         </div>
       </section>
@@ -184,9 +187,9 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
           <div style={{ background: 'rgba(0, 242, 254, 0.1)', color: 'var(--primary-neon)', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', border: '1px solid rgba(0, 242, 254, 0.25)' }}>
             <Eye size={24} />
           </div>
-          <h2 style={{ fontSize: '1.65rem', marginBottom: '14px', fontWeight: 700 }}>The CivicPulse Solution</h2>
+          <h2 style={{ fontSize: '1.65rem', marginBottom: '14px', fontWeight: 700 }}>Intelligence built for civic complexity</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.65 }}>
-            CivicPulse feeds photos and descriptions directly into an AI model for category and severity detection. A mathematical engine calculates a priority score (0–100) based on location risks, while a spatial clustering algorithm automatically groups multiple citizen reports into a single, unified civic incident.
+            India's governance operates at a scale that demands more than dashboards. Naagrik turns fragmented public data into structured, decision-ready insight — across every ward, district, and department.
           </p>
         </GlassEffect>
       </section>
@@ -236,17 +239,17 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
                 Priority scores calculated on factors, not guesses
               </h2>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.65, marginBottom: '20px' }}>
-                Our proprietary scoring system calculates priority scores dynamically using structured metrics rather than qualitative models:
+                Our proprietary scoring system calculates priority based on dynamic factors instead of relying on preset metrics or theoretical guess by qualitative models:
               </p>
               <ul style={{ color: 'var(--text-muted)', fontSize: '0.9rem', paddingLeft: '20px', lineHeight: 1.8 }}>
-                <li><strong style={{ color: 'var(--text-main)' }}>Base Weights</strong>: Assigned by problem category and detected severity level.</li>
-                <li><strong style={{ color: 'var(--text-main)' }}>Vulnerability Multiplier</strong>: Boosts score by 10 points if near metro stations, hospitals, schools, or highways.</li>
-                <li><strong style={{ color: 'var(--text-main)' }}>Citizen Count Bonus</strong>: Increments priority as duplicate reports cluster, emphasizing popular concerns.</li>
+                <li><strong style={{ color: 'var(--text-main)' }}>Base priority</strong>: Assigned based on problem category and detected severity level.</li>
+                <li><strong style={{ color: 'var(--text-main)' }}>Vulnerability Multiplier</strong>: Boosts score by 10 points based on proximity to metro stations, hospitals, schools, or highways.</li>
+                <li><strong style={{ color: 'var(--text-main)' }}>Cluster report Increments</strong>: Increments in priority as duplicate reports cluster, emphasizing popular concerns.</li>
               </ul>
             </div>
             
             <div className="flex-row-center" style={{ 
-              background: 'linear-gradient(135deg, rgba(14, 19, 40, 0.88) 0%, rgba(7, 10, 22, 0.94) 100%)', 
+              background: 'linear-gradient(135deg, rgba(14, 19, 40, 0.62) 0%, rgba(7, 10, 22, 0.74) 100%)', 
               backdropFilter: 'blur(24px)', 
               WebkitBackdropFilter: 'blur(24px)', 
               border: '1px solid rgba(255, 255, 255, 0.12)', 
@@ -275,7 +278,7 @@ export default function LandingPage({ onNavigate, user, onLogout }) {
       <footer style={{ borderTop: '1px solid var(--border-light)', paddingTop: '28px', marginTop: '48px' }}>
         <div className="container flex-row-between" style={{ flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            &copy; 2026 CivicPulse AI. Developed by <strong>Apex Eagles</strong>.
+            &copy; 2026 Naagrik. Developed by <strong>The Predator</strong>.
           </div>
           <div style={{ fontSize: '0.85rem', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             <a href="#terms" onClick={(e) => { e.preventDefault(); }} style={{ color: 'var(--text-muted)', textDecoration: 'none', transition: 'color 0.2s' }}>Terms</a>

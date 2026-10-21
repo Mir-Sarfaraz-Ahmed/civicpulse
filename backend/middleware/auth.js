@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'civicpulse_hackathon_jwt_secret_2026_key';
+const JWT_SECRET = process.env.JWT_SECRET || 'naagrik_jwt_secret_2026_key';
 
 function decodeFirebaseToken(token) {
   try {

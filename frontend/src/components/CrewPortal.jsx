@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { TruckIcon } from './ui/TruckIcon';
 import { 
   Truck, 
   Wrench, 
@@ -274,8 +275,8 @@ export default function CrewPortal({ token, user, onLogout, onBackToHome }) {
       <header className="navbar">
         <div className="container flex-row-between" style={{ height: '100%' }}>
           <div className="nav-logo flex-row-center" style={{ gap: '10px' }}>
-            <Truck size={22} className="neon-text" />
-            <span>Civic<span className="neon-text">Pulse</span> Dispatch Crew</span>
+            <TruckIcon size={24} className="neon-text" />
+            <span>Naagrik Dispatch Crew</span>
             <span style={{ fontSize: '0.75rem', background: 'rgba(255,170,0,0.15)', color: 'var(--color-medium)', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(255,170,0,0.3)', fontWeight: 600 }}>
               FIELD RESPONSE UNIT
             </span>

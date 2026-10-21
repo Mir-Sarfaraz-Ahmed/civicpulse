@@ -23,7 +23,7 @@ function writeDemoImage(name, colorKey) {
   return `data:image/png;base64,${data}`;
 }
 
-// Seed Route (Public, to initialize hackathon review easily)
+// Seed Route (Public, to initialize demo data easily)
 // Endpoint: POST /api/demo/seed
 router.post('/seed', (req, res) => {
   try {

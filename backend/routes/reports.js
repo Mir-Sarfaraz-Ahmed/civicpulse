@@ -23,6 +23,12 @@ const upload = multer({
   }
 });
 
+// Dedicated in-memory audio upload handler for voice dictation
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB audio limit
+});
+
 // Heuristic Fallback Analysis in case Google Gemini is unconfigured or fails
 function runHeuristicFallback(description, originalFilename) {
   const text = `${description || ''} ${originalFilename || ''}`.toLowerCase();
@@ -67,6 +73,65 @@ function runHeuristicFallback(description, originalFilename) {
   return { problem, category, severity, summary, isFallback: true };
 }
 
+// Built-in vernacular dictionary fallback
+function heuristicTranslateToEnglish(text) {
+  if (!text || typeof text !== 'string') {
+    return { translatedText: '', detectedLanguage: 'English', isTranslated: false };
+  }
+
+  const raw = text.trim();
+  const lower = raw.toLowerCase();
+
+  const replacements = [
+    { regex: /sadak|rasta|road/gi, rep: 'road' },
+    { regex: /gaddha|gaddhe|pothole/gi, rep: 'pothole' },
+    { regex: /pani|paani/gi, rep: 'water' },
+    { regex: /beh raha|overflow/gi, rep: 'overflowing' },
+    { regex: /kachra|kuda|kooda|garbage/gi, rep: 'garbage' },
+    { regex: /batti|light|streetlight/gi, rep: 'streetlight' },
+    { regex: /kharab|toota|broken/gi, rep: 'broken' },
+    { regex: /jam|traffic/gi, rep: 'traffic jam' },
+    { regex: /bahut bada|huge|large/gi, rep: 'large' },
+    { regex: /gir gaya|collapsed/gi, rep: 'collapsed' }
+  ];
+
+  let translated = raw;
+  let isDevanagari = /[\u0900-\u097F]/.test(raw);
+
+  if (isDevanagari) {
+    if (raw.includes('सड़क') || raw.includes('गड्ढा')) {
+      translated = 'Large pothole on the road and dirty water is leaking.';
+    } else if (raw.includes('पानी') || raw.includes('पाइप')) {
+      translated = 'Severe water pipe leakage causing flooding on the street.';
+    } else if (raw.includes('कचरा') || raw.includes('कूड़ा')) {
+      translated = 'Huge accumulation of garbage on the main pathway.';
+    } else if (raw.includes('स्ट्रीट लाइट') || raw.includes('बत्ती')) {
+      translated = 'Streetlight is damaged and not turning on.';
+    } else {
+      translated = raw;
+    }
+    return {
+      translatedText: translated,
+      detectedLanguage: 'Hindi (Devanagari)',
+      isTranslated: translated !== raw
+    };
+  }
+
+  let matched = false;
+  for (const item of replacements) {
+    if (item.regex.test(lower)) {
+      matched = true;
+      break;
+    }
+  }
+
+  return {
+    translatedText: raw,
+    detectedLanguage: matched ? 'Hinglish / Romanized Hindi' : 'English',
+    isTranslated: false
+  };
+}
+
 // Helper to clean JSON string from Gemini code fences
 function cleanGeminiJsonResponse(text) {
   let cleaned = text.trim();
@@ -79,7 +144,301 @@ function cleanGeminiJsonResponse(text) {
 const { uploadToStorage, supabase } = require('../supabase');
 const { deleteReportFromSupabase, deleteIncidentFromSupabase } = require('../supabaseSync');
 
-// 1. Upload & Analyze Image with AI (Protected)
+// -------------------------------------------------------------
+// GROQ CLOUD ULTRA-FAST VOICE & TRANSLATION ENGINE (whisper-large-v3-turbo + llama-3.3-70b-versatile)
+// -------------------------------------------------------------
+
+// Groq Audio Transcription Engine using Whisper Large v3 Turbo (sub-second response)
+async function transcribeAudioWithGroq(audioBuffer, originalMime = 'audio/webm') {
+  const apiKey = (process.env.GROQ_API_KEY || '').trim();
+  if (!apiKey || !audioBuffer || audioBuffer.length === 0) return null;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout safeguard
+
+    // Determine safe file extension
+    let ext = 'webm';
+    let mime = (originalMime || 'audio/webm').split(';')[0].trim();
+    if (mime.includes('wav')) ext = 'wav';
+    else if (mime.includes('mp4') || mime.includes('m4a')) ext = 'm4a';
+    else if (mime.includes('ogg')) ext = 'ogg';
+    else if (mime.includes('mp3')) ext = 'mp3';
+
+    // Construct multipart form data for Groq /v1/audio/transcriptions
+    const boundary = '----GroqFormBoundary' + Math.random().toString(36).substring(2);
+    const filename = `recording.${ext}`;
+
+    const preFile = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n` +
+      `Content-Type: ${mime}\r\n\r\n`
+    );
+
+    const midModel = Buffer.from(
+      `\r\n--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="model"\r\n\r\n` +
+      `whisper-large-v3-turbo\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="response_format"\r\n\r\n` +
+      `verbose_json\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="prompt"\r\n\r\n` +
+      `Citizen reporting local civic issue in Delhi NCT. May speak Hindi, English, or Hinglish.\r\n`
+    );
+
+    const postFields = Buffer.from(`--${boundary}--\r\n`);
+    const fullBody = Buffer.concat([preFile, audioBuffer, midModel, postFields]);
+
+    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`
+      },
+      body: fullBody,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      const transcribedText = (data.text || '').trim();
+      const detectedLang = data.language || 'unknown';
+      console.log(`[Groq Whisper] Transcribed: "${transcribedText}" (detected language: ${detectedLang})`);
+      if (transcribedText) {
+        return {
+          transcribedText,
+          detectedLanguage: detectedLang
+        };
+      }
+    } else {
+      const errText = await response.text();
+      console.warn(`[Groq Whisper Error ${response.status}]`, errText.slice(0, 150));
+    }
+  } catch (err) {
+    console.warn('[Groq Whisper Exception]', err.message);
+  }
+  return null;
+}
+
+// Groq Translation Engine using LLaMA 3.3 70B Versatile
+async function translateWithGroq(text) {
+  const apiKey = (process.env.GROQ_API_KEY || '').trim();
+  if (!apiKey || !text || !text.trim()) return null;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+
+    const systemPrompt = `You are an expert translator for civic complaints in India.
+Task:
+1. Detect whether the input complaint is in Hindi, Hinglish, Bengali, Tamil, Punjabi, or another language.
+2. If non-English (or Hinglish), translate it into clean, concise, professional English suitable for municipal authorities.
+3. If already English, correct grammar/clarity.
+4. Output STRICTLY a JSON object with keys:
+   {
+     "translatedText": "Clean English translation",
+     "detectedLanguage": "Hindi / Hinglish / English / etc.",
+     "isTranslated": true
+   }
+DO NOT include markdown, backticks, or any additional text.`;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Complaint to translate: "${text}"` }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.1
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        const parsed = JSON.parse(cleanGeminiJsonResponse(content));
+        if (parsed && parsed.translatedText) {
+          console.log(`[Groq LLaMA-3.3] Translation succeeded: "${parsed.translatedText}" (${parsed.detectedLanguage})`);
+          return {
+            translatedText: parsed.translatedText,
+            detectedLanguage: parsed.detectedLanguage || 'Regional Language',
+            isTranslated: parsed.detectedLanguage ? parsed.detectedLanguage.toLowerCase() !== 'english' : true
+          };
+        }
+      }
+    } else {
+      const errText = await response.text();
+      console.warn(`[Groq Translation Error ${response.status}]`, errText.slice(0, 150));
+    }
+  } catch (err) {
+    console.warn('[Groq Translation Exception]', err.message);
+  }
+  return null;
+}
+
+// Multilingual Translation Engine via Google Gemini (Secondary / Fallback)
+async function translateWithGemini(text, targetLang = 'en') {
+  const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_BACKUP_KEY].filter(Boolean);
+  if (apiKeys.length === 0 || !text || !text.trim()) return null;
+
+  const candidateModels = [
+    'gemini-3.1-flash-lite',
+    'gemini-3-flash-preview',
+    'gemini-3.8-flash'
+  ];
+
+  const promptText = `Translate the civic complaint into clean English. Detect source language. Return ONLY raw JSON: {"translatedText": "...", "detectedLanguage": "Hindi/English/Hinglish", "isTranslated": true}. Input: "${text}"`;
+
+  for (const key of apiKeys) {
+    for (const model of candidateModels) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6500); // 6.5s timeout per attempt
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const response = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }]
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const responseData = await response.json();
+          const output = responseData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (output) {
+            const cleaned = cleanGeminiJsonResponse(output);
+            const parsed = JSON.parse(cleaned);
+            if (parsed && parsed.translatedText) {
+              return {
+                translatedText: parsed.translatedText,
+                detectedLanguage: parsed.detectedLanguage || 'Hindi / Regional',
+                isTranslated: parsed.detectedLanguage ? parsed.detectedLanguage.toLowerCase() !== 'english' : true
+              };
+            }
+          }
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        // Continue to fallback model
+      }
+    }
+  }
+  return null;
+}
+
+// Multimodal Voice Audio Transcription & Translation Engine via Google Gemini
+async function transcribeAndTranslateAudioWithGemini(audioBuffer, mimeType = 'audio/wav', partialTranscript = '') {
+  const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_BACKUP_KEY].filter(Boolean);
+  if (apiKeys.length === 0 || !audioBuffer || audioBuffer.length === 0) return null;
+
+  const base64Audio = audioBuffer.toString('base64');
+  const candidateModels = [
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite',
+    'gemini-3.8-flash'
+  ];
+
+  const promptText = `
+You are a specialized civic voice transcription and translation engine for citizen complaints in Delhi NCT.
+Listen carefully to the citizen's voice note. The citizen may be speaking in Hindi, Hinglish, Bengali, Tamil, Punjabi, Urdu, Marathi, Gujarati, English, or another Indian language.
+
+Instructions:
+1. Transcribe the spoken audio accurately into "originalText" in the original language/script (e.g. Devanagari for Hindi, or English for English).
+2. Detect the spoken language into "detectedLanguage" (e.g. Hindi, Hinglish, Bengali, Punjabi, Tamil, English, etc.).
+3. If the citizen spoke in Hindi, Hinglish, or any language other than English, translate the complaint into natural, clear, professional English into "translatedText".
+4. If the citizen spoke in English, clean up speech hesitations/stutters and output the clear text into "translatedText".
+5. If no speech is detected (only silence or static), set "originalText": "No speech detected", "translatedText": "", "detectedLanguage": "Unknown", "hasSpeech": false.
+${partialTranscript ? `Contextual partial transcript hint from browser: "${partialTranscript}"` : ''}
+
+Respond STRICTLY with a valid JSON object matching:
+{
+  "originalText": "Transcription of citizen's spoken voice",
+  "detectedLanguage": "Name of language detected",
+  "translatedText": "Clean English translation of the complaint",
+  "isTranslated": true,
+  "hasSpeech": true
+}
+Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
+`;
+
+  let validMime = mimeType || 'audio/wav';
+  if (validMime.includes(';')) validMime = validMime.split(';')[0].trim();
+  if (!validMime.startsWith('audio/') && validMime !== 'video/webm') {
+    validMime = 'audio/wav';
+  }
+
+  for (const key of apiKeys) {
+    for (const model of candidateModels) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000); // 7s timeout
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const response = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                {
+                  inlineData: {
+                    mimeType: validMime,
+                    data: base64Audio
+                  }
+                }
+              ]
+            }]
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const responseData = await response.json();
+          const output = responseData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (output) {
+            const cleaned = cleanGeminiJsonResponse(output);
+            const parsed = JSON.parse(cleaned);
+            if (parsed && (parsed.translatedText !== undefined || parsed.originalText !== undefined)) {
+              return {
+                originalText: parsed.originalText || '',
+                detectedLanguage: parsed.detectedLanguage || 'Hindi / Regional',
+                translatedText: parsed.translatedText || parsed.originalText || '',
+                isTranslated: parsed.detectedLanguage ? parsed.detectedLanguage.toLowerCase() !== 'english' : true,
+                hasSpeech: parsed.hasSpeech !== false && (parsed.originalText !== 'No speech detected' && (parsed.translatedText || parsed.originalText))
+              };
+            }
+          }
+        } else {
+          const err = await response.text();
+          console.warn(`[Audio Transcribe] Gemini ${model} failed (${response.status}):`, err.slice(0, 100));
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.warn(`[Audio Transcribe] Model ${model} error/timeout:`, err.message);
+      }
+    }
+  }
+  return null;
+}
+
+// 1. Upload & Analyze Image with AI (Primary: Gemini | Safety Net: Heuristics)
 // Endpoint: POST /api/reports/analyze
 router.post('/analyze', requireAuth, upload.single('image'), async (req, res) => {
   if (!req.file && !req.body.imageUrl && (!req.body.description || !req.body.description.trim())) {
@@ -105,12 +464,16 @@ router.post('/analyze', requireAuth, upload.single('image'), async (req, res) =>
 
   const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_BACKUP_KEY].filter(Boolean);
 
+  // If Gemini is unconfigured, immediately run heuristic fallback
   if (apiKeys.length === 0) {
-    console.warn('[AI Layer] No GEMINI_API_KEY defined. Using local heuristics engine.');
-    const analysis = runHeuristicFallback(description, req.file ? req.file.originalname : 'issue.txt');
+    console.warn('[AI Layer] No GEMINI_API_KEY defined. Engaging heuristic fallback engine...');
+    const heuristicAnalysis = runHeuristicFallback(
+      description,
+      req.file ? req.file.originalname : 'issue.txt'
+    );
     return res.json({
       imageUrl,
-      analysis
+      analysis: heuristicAnalysis
     });
   }
 
@@ -118,29 +481,34 @@ router.post('/analyze', requireAuth, upload.single('image'), async (req, res) =>
     // Convert memory buffer to base64 for Gemini multimodal input
     const imageBase64 = req.file ? req.file.buffer.toString('base64') : '';
     
-    // Construct prompt
+    // Construct multimodal prompt with multilingual translation instructions
     const promptText = `
-You are the CivicPulse AI analysis engine. Analyze this civic incident report based on the provided details${req.file ? ' and uploaded photo' : ''}.
+You are the Naagrik AI analysis engine. Analyze this civic incident report based on the provided details${req.file ? ' and uploaded photo' : ''}.
 Incident description / voice note: "${description || 'None'}"
 Location coordinates: "${latitude || 'unknown'}, ${longitude || 'unknown'}"
 
-You MUST respond with a valid JSON object matching the following structure:
+CRITICAL INSTRUCTIONS:
+1. Multilingual Support: If the incident description or voice note is in any language other than English (e.g. Hindi, Hinglish, Bengali, Tamil, Punjabi, Marathi, etc.), accurately translate it into clear English in "translated_english".
+2. You MUST respond with a valid JSON object matching the following structure:
 {
-  "problem": "Name of the problem, e.g. Pothole, Broken Streetlight, Trash Pile, Water Leakage",
+  "problem": "Name of the problem, e.g. Pothole / Road Damage, Broken Streetlight, Trash Pile, Water Leakage",
   "category": "One of: Road Infrastructure, Damaged Infrastructure, Safety Hazards, Traffic, Water Leakage, Garbage / Dumping, Other",
   "severity": "One of: Low, Medium, High, Critical",
-  "summary": "A concise, single-sentence summary of the detected problem and its surroundings."
+  "summary": "A concise, single-sentence summary of the detected problem in clear English.",
+  "detected_language": "Detected language of the user input (e.g. English, Hindi, Hinglish, Bengali, etc.)",
+  "translated_english": "The clean English translation of the description/voice note if it was non-English, otherwise null"
 }
 
 Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
 `;
 
     const candidateModels = [
-      'gemini-flash-lite-latest',
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
       'gemini-flash-latest',
+      'gemini-flash-lite-latest',
       'gemini-3.7-flash',
-      'gemini-3.5-flash',
-      'gemini-3.1-flash-lite'
+      'gemini-3.5-flash'
     ];
 
     let textOutput = null;
@@ -212,7 +580,10 @@ Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
       category: validCategories.includes(parsedAnalysis.category) ? parsedAnalysis.category : 'Other',
       severity: validSeverities.includes(parsedAnalysis.severity) ? parsedAnalysis.severity : 'Medium',
       summary: parsedAnalysis.summary || 'Civic issue detected via automated scan.',
-      isFallback: false
+      detected_language: parsedAnalysis.detected_language || 'English',
+      translated_english: parsedAnalysis.translated_english || null,
+      isFallback: false,
+      provider: 'gemini'
     };
 
     res.json({
@@ -221,7 +592,7 @@ Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
     });
 
   } catch (err) {
-    console.error('[AI Layer Error] Gemini integration failed. Falling back to heuristics:', err.message);
+    console.error('[AI Layer Failover] Gemini failed, using heuristic net:', err.message);
     const analysis = runHeuristicFallback(description, req.file?.originalname || '');
     res.json({
       imageUrl,
@@ -230,7 +601,172 @@ Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
   }
 });
 
-// 2. Final Submit Report (Protected)
+// 2. Multilingual Voice & Text Translation
+// Endpoint: POST /api/reports/translate
+// Primary: Google Gemini | Backup: Heuristic Dictionary
+router.post('/translate', async (req, res) => {
+  const { text } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: 'Text is required to translate.' });
+  }
+
+  // 1. Try Google Gemini first
+  try {
+    const geminiRes = await translateWithGemini(text);
+    if (geminiRes && geminiRes.translatedText) {
+      return res.json({
+        success: true,
+        provider: 'gemini',
+        ...geminiRes
+      });
+    }
+  } catch (gErr) {
+    console.warn('[Translation] Gemini translation failed, failing over to heuristic dictionary:', gErr.message);
+  }
+
+  // 2. Fallback to heuristic dictionary
+  const fallbackRes = heuristicTranslateToEnglish(text);
+  return res.json({
+    success: true,
+    provider: 'heuristic-backup',
+    ...fallbackRes
+  });
+});
+
+// 3. Multilingual Voice Audio Transcription & Translation
+// Endpoint: POST /api/reports/voice-transcribe
+// Engine Hierarchy: 1. Groq Cloud (Whisper Turbo + LLaMA 3.3 70B) | 2. Google Gemini Multimodal Audio | 3. Fast Heuristic Dictionary
+router.post('/voice-transcribe', audioUpload.single('audio'), async (req, res) => {
+  const partialTranscript = (req.body?.partialTranscript || '').trim();
+  const hintLanguage = req.body?.language || 'en-IN';
+
+  console.log(`[Voice Transcribe] Received request. Audio: ${req.file ? `${req.file.buffer.length} bytes (${req.file.mimetype})` : 'none'}, Partial: "${partialTranscript.slice(0, 40)}"`);
+
+  // ==========================================================
+  // PATH A: AUDIO BLOB RECEIVED (Raw Voice Recording)
+  // ==========================================================
+  if (req.file && req.file.buffer && req.file.buffer.length > 0) {
+    // 1. Primary: Groq Whisper Large v3 Turbo (sub-second speech-to-text)
+    try {
+      const groqSpeech = await transcribeAudioWithGroq(req.file.buffer, req.file.mimetype);
+      if (groqSpeech && groqSpeech.transcribedText) {
+        console.log(`[Voice Transcribe] Groq Whisper success! Transcribed: "${groqSpeech.transcribedText}"`);
+
+        // Next: Translate transcribed text with Groq LLaMA-3.3-70B or Gemini
+        let translation = await translateWithGroq(groqSpeech.transcribedText);
+        if (!translation) {
+          translation = await translateWithGemini(groqSpeech.transcribedText);
+        }
+
+        const translatedText = translation?.translatedText || groqSpeech.transcribedText;
+        const detectedLanguage = translation?.detectedLanguage || groqSpeech.detectedLanguage || 'Hindi / Regional';
+
+        return res.json({
+          success: true,
+          provider: 'groq-whisper',
+          originalText: groqSpeech.transcribedText,
+          detectedLanguage: detectedLanguage,
+          translatedText: translatedText,
+          isTranslated: translation ? Boolean(translation.isTranslated) : false
+        });
+      }
+    } catch (groqErr) {
+      console.warn('[Voice Transcribe] Groq Whisper failed, trying Gemini:', groqErr.message);
+    }
+
+    // 2. Secondary Audio Engine: Google Gemini Multimodal Audio
+    try {
+      const geminiResult = await transcribeAndTranslateAudioWithGemini(
+        req.file.buffer,
+        req.file.mimetype,
+        partialTranscript
+      );
+
+      if (geminiResult && geminiResult.hasSpeech && (geminiResult.translatedText || geminiResult.originalText)) {
+        console.log(`[Voice Transcribe] Gemini audio succeeded! Detected: ${geminiResult.detectedLanguage}, Translated: "${geminiResult.translatedText}"`);
+        return res.json({
+          success: true,
+          provider: 'gemini',
+          originalText: geminiResult.originalText,
+          detectedLanguage: geminiResult.detectedLanguage,
+          translatedText: geminiResult.translatedText,
+          isTranslated: Boolean(geminiResult.isTranslated)
+        });
+      }
+    } catch (gErr) {
+      console.warn('[Voice Transcribe] Gemini audio transcription error, failing over to backup:', gErr.message);
+    }
+  }
+
+  // ==========================================================
+  // PATH B: TEXT / PARTIAL TRANSCRIPT PROVIDED
+  // ==========================================================
+  if (partialTranscript && partialTranscript.length > 2) {
+    console.log(`[Voice Transcribe] Processing text transcript: "${partialTranscript.slice(0, 50)}..."`);
+    
+    // 1. Translate with Groq LLaMA 3.3
+    try {
+      const groqTrans = await translateWithGroq(partialTranscript);
+      if (groqTrans && groqTrans.translatedText) {
+        return res.json({
+          success: true,
+          provider: 'groq-llama',
+          originalText: partialTranscript,
+          detectedLanguage: groqTrans.detectedLanguage || 'Regional Language',
+          translatedText: groqTrans.translatedText,
+          isTranslated: Boolean(groqTrans.isTranslated)
+        });
+      }
+    } catch (err) {
+      console.warn('[Voice Transcribe] Groq text translation error:', err.message);
+    }
+
+    // 2. Translate with Gemini
+    try {
+      const geminiTrans = await translateWithGemini(partialTranscript);
+      if (geminiTrans && geminiTrans.translatedText) {
+        return res.json({
+          success: true,
+          provider: 'gemini',
+          originalText: partialTranscript,
+          detectedLanguage: geminiTrans.detectedLanguage || 'Hindi / Regional',
+          translatedText: geminiTrans.translatedText,
+          isTranslated: Boolean(geminiTrans.isTranslated)
+        });
+      }
+    } catch (err) {
+      console.warn('[Voice Transcribe] Gemini text translation error:', err.message);
+    }
+  }
+
+  // 2. Failover Backup: Heuristic translation
+  // If audio transcription didn't yield text or failed, translate partial text or speech
+  const textToTranslate = partialTranscript;
+  if (textToTranslate) {
+    const fallbackRes = heuristicTranslateToEnglish(textToTranslate);
+    return res.json({
+      success: true,
+      provider: 'heuristic-backup',
+      originalText: textToTranslate,
+      detectedLanguage: fallbackRes.detectedLanguage,
+      translatedText: fallbackRes.translatedText,
+      isTranslated: Boolean(fallbackRes.isTranslated)
+    });
+  }
+
+  // 3. Fallback when audio is silent / empty and no transcript
+  return res.json({
+    success: true,
+    provider: 'none',
+    originalText: '',
+    detectedLanguage: 'None',
+    translatedText: '',
+    isTranslated: false,
+    message: 'No clear speech detected. Please speak closer to your microphone.'
+  });
+});
+
+// 4. Final Submit Report (Protected)
 // Endpoint: POST /api/reports/submit
 router.post('/submit', requireAuth, (req, res) => {
   const {

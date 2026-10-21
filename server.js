@@ -46,14 +46,12 @@ const authRouter = require('./backend/routes/auth');
 const reportsRouter = require('./backend/routes/reports');
 const incidentsRouter = require('./backend/routes/incidents');
 const demoRouter = require('./backend/routes/demo');
-const tinyfishRouter = require('./backend/routes/tinyfish');
 
 // Mount Routers
 app.use('/api/auth', authRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/incidents', incidentsRouter);
 app.use('/api/demo', demoRouter);
-app.use('/api/tinyfish', tinyfishRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -97,8 +95,8 @@ async function startServer() {
 
   // Start Server on 0.0.0.0:3000
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[CivicPulse AI Server] Running on http://0.0.0.0:${PORT}`);
-    console.log(`[CivicPulse AI Server] Serving uploads statically at /uploads`);
+    console.log(`[Naagrik AI Server] Running on http://0.0.0.0:${PORT}`);
+    console.log(`[Naagrik AI Server] Serving uploads statically at /uploads`);
   });
 }
 

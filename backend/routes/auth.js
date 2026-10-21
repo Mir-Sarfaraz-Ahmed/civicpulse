@@ -106,7 +106,7 @@ router.post('/login', (req, res) => {
     }
 
     // For preset demo accounts (admin@gmail.com, crew@gmail.com, citizen@gmail.com),
-    // accept ANY password entered by the user/judge so they are never blocked!
+    // accept ANY password entered by the demo user so they are never blocked!
     const isPresetDemo = ['admin@gmail.com', 'crew@gmail.com', 'citizen@gmail.com'].includes(normalizedEmail);
     let matches = false;
 
@@ -134,48 +134,7 @@ router.post('/login', (req, res) => {
   }
 });
 
-// 3. Google Sign-In (Civilian only)
-// Integrates with client Google One-Tap/Sign-In and handles automatic user creation if email is new.
-router.post('/google-login', (req, res) => {
-  const { email, name, sub } = req.body;
 
-  if (!email || !name) {
-    return res.status(400).json({ error: 'Email and Name are required from Google profile.' });
-  }
-
-  const normalizedEmail = email.toLowerCase().trim();
-
-  try {
-    let user = query.get('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
-
-    if (user) {
-      // User exists. Ensure civilian role (Google login is only for civilians in this scope)
-      if (user.role !== 'civilian') {
-        return res.status(403).json({ error: 'Google Login is only supported for civilian accounts.' });
-      }
-      console.log(`[Auth] Existing civilian logged in via Google: ${normalizedEmail}`);
-    } else {
-      // Create new civilian user
-      const id = uuidv4();
-      query.run(
-        'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, NULL, ?, ?)',
-        [id, normalizedEmail, 'civilian', name.trim()]
-      );
-      user = { id, email: normalizedEmail, role: 'civilian', name };
-      console.log(`[Auth] New civilian registered via Google: ${normalizedEmail}`);
-    }
-
-    const token = generateToken(user);
-
-    res.json({
-      token,
-      user: { id: user.id, email: user.email, role: user.role, name: user.name }
-    });
-  } catch (err) {
-    console.error('[Auth Error] Google login failed:', err);
-    res.status(500).json({ error: 'Internal server error during Google login.' });
-  }
-});
 
 // 4. Retrieve Profile Session (Protected)
 router.get('/me', requireAuth, (req, res) => {
