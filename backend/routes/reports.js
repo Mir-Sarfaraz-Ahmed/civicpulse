@@ -449,36 +449,39 @@ router.post('/analyze', requireAuth, upload.single('image'), async (req, res) =>
   const userId = req.user?.id || 'citizen';
   let imageUrl = req.body.imageUrl || '';
 
-  // Upload buffer directly to Supabase Storage in user's folder if not already uploaded
+  // 1. Start storage upload in background concurrently with AI inference
+  let storagePromise = null;
   if (req.file && !imageUrl) {
-    try {
-      const storageUrl = await uploadToStorage(req.file.buffer, req.file.originalname, req.file.mimetype, 'reports', userId);
-      if (storageUrl) {
-        imageUrl = storageUrl;
-        console.log(`[Supabase Storage] Report image saved to user folder: ${imageUrl}`);
-      }
-    } catch (storageErr) {
-      console.warn('[Supabase Storage Warning] Upload error:', storageErr.message);
-    }
+    storagePromise = uploadToStorage(req.file.buffer, req.file.originalname, req.file.mimetype, 'reports', userId)
+      .then(url => {
+        if (url) console.log(`[Supabase Storage] Report image saved: ${url}`);
+        return url;
+      })
+      .catch(storageErr => {
+        console.warn('[Supabase Storage Warning] Upload error:', storageErr.message);
+        return null;
+      });
+  } else {
+    storagePromise = Promise.resolve(imageUrl);
   }
 
   const apiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_BACKUP_KEY].filter(Boolean);
 
-  // If Gemini is unconfigured, immediately run heuristic fallback
+  // If Gemini is unconfigured, immediately run fast heuristic fallback
   if (apiKeys.length === 0) {
-    console.warn('[AI Layer] No GEMINI_API_KEY defined. Engaging heuristic fallback engine...');
+    console.warn('[AI Layer] No GEMINI_API_KEY defined. Engaging fast heuristic engine...');
+    const resolvedImageUrl = (await storagePromise) || imageUrl || '';
     const heuristicAnalysis = runHeuristicFallback(
       description,
       req.file ? req.file.originalname : 'issue.txt'
     );
     return res.json({
-      imageUrl,
+      imageUrl: resolvedImageUrl,
       analysis: heuristicAnalysis
     });
   }
 
   try {
-    // Convert memory buffer to base64 for Gemini multimodal input
     const imageBase64 = req.file ? req.file.buffer.toString('base64') : '';
     
     // Construct multimodal prompt with multilingual translation instructions
@@ -502,19 +505,19 @@ CRITICAL INSTRUCTIONS:
 Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
 `;
 
+    // Prioritize official ultra-fast sub-second flash models
     const candidateModels = [
-      'gemini-3.8-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-8b',
       'gemini-2.5-flash',
-      'gemini-flash-latest',
-      'gemini-flash-lite-latest',
-      'gemini-3.7-flash',
-      'gemini-3.5-flash'
+      'gemini-3.8-flash'
     ];
 
     let textOutput = null;
     let successfulModel = null;
 
-    // Try available keys and candidate models
+    // Fast-fail loop with 4.5s strict timeout per attempt
     for (const key of apiKeys) {
       for (const model of candidateModels) {
         try {
@@ -536,7 +539,8 @@ Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
             },
             body: JSON.stringify({
               contents: [{ parts }]
-            })
+            }),
+            signal: AbortSignal.timeout(4500) // Fast 4.5s timeout prevents hanging
           });
 
           if (response.ok) {
@@ -552,14 +556,22 @@ Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
             console.warn(`[AI Layer] Model ${model} returned ${response.status}: ${errText.slice(0, 100)}`);
           }
         } catch (modelErr) {
-          console.warn(`[AI Layer] Model ${model} request failed:`, modelErr.message);
+          console.warn(`[AI Layer] Model ${model} attempt (${modelErr.message}) - checking next...`);
         }
       }
       if (textOutput) break;
     }
 
+    // Await storage upload that was running concurrently
+    const resolvedImageUrl = (await storagePromise) || imageUrl || '';
+
     if (!textOutput) {
-      throw new Error('All Gemini models and API keys failed to return output.');
+      console.warn('[AI Layer Failover] Fast heuristic safety net engaged.');
+      const fallbackAnalysis = runHeuristicFallback(description, req.file?.originalname || '');
+      return res.json({
+        imageUrl: resolvedImageUrl,
+        analysis: fallbackAnalysis
+      });
     }
 
     console.log(`[AI Layer] Raw Gemini output from ${successfulModel}:`, textOutput);
@@ -587,15 +599,16 @@ Provide ONLY the raw JSON object, without markdown syntax or triple backticks.
     };
 
     res.json({
-      imageUrl,
+      imageUrl: resolvedImageUrl,
       analysis
     });
 
   } catch (err) {
-    console.error('[AI Layer Failover] Gemini failed, using heuristic net:', err.message);
+    console.error('[AI Layer Failover] Error, using heuristic net:', err.message);
+    const resolvedImageUrl = (await storagePromise) || imageUrl || '';
     const analysis = runHeuristicFallback(description, req.file?.originalname || '');
     res.json({
-      imageUrl,
+      imageUrl: resolvedImageUrl,
       analysis
     });
   }
